@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "kind": "stdlib_venv",
+  "prefix": "F:\\DevProjects\\_Envs\\LightFringe\\A4-R1",
+  "python": "3.12.16",
+  "architecture": "win_amd64",
+  "base_interpreter": "F:\\Tools\\Anaconda3\\envs\\lightfringe-p0\\python.exe",
+  "base_interpreter_sha256": "8ca4da526986e93e627ee6bff1fc1f8a2bccfca5f5e393b15ad7689c44614f09",
+  "base_role": "Read-only Python stdlib/DLL dependency; base prefix must remain available; no system-site-packages",
+  "requirements": "requirements-a4.txt",
+  "requirements_sha256": "f346e377a19a21befc5a01bed7afd14d02992aa7339e775f14b39a806ac63eb1",
+  "launcher": "run.cmd",
+  "module": "lightfringe",
+  "window_class": "lightfringe.airy_pdf_gui.AiryPdfMainWindow",
+  "OPENBLAS_NUM_THREADS": "1",
+  "candidate_runtime_paths_allowed": false,
+  "version_label_change": false
+}

@@ -1,0 +1,54 @@
+# LightFringe initial 48-file seed: preserve recorded bytes.
+# Static policy only; effective Git attributes, blob and checkout bytes remain unqualified.
+# Explicit unset differs from unspecified. Never add LFS/clean/encoding transforms silently.
+* -text -filter -ident -working-tree-encoding -eol
+
+# Exact approved initial paths; future additions need a reviewed policy/allowlist update.
+/.gitattributes -text -filter -ident -working-tree-encoding -eol
+/.gitignore -text -filter -ident -working-tree-encoding -eol
+/CHANGELOG.md -text -filter -ident -working-tree-encoding -eol
+/README.md -text -filter -ident -working-tree-encoding -eol
+/THIRD-PARTY-NOTICES.md -text -filter -ident -working-tree-encoding -eol
+/artifacts/LF-P0-A2-R1/BEGIN_nominal_outputs.json -text -filter -ident -working-tree-encoding -eol
+/artifacts/LF-P0-A2-R1/baseline/lightfringe/model.py -text -filter -ident -working-tree-encoding -eol
+/artifacts/LF-P0-A2-R1/baseline/lightfringe/rendering.py -text -filter -ident -working-tree-encoding -eol
+/artifacts/LF-P0-A2-R1/baseline/lightfringe/sampling.py -text -filter -ident -working-tree-encoding -eol
+/artifacts/LF-P0-A3-MULTISLIT-R1/BEGIN_nominal_outputs.json -text -filter -ident -working-tree-encoding -eol
+/artifacts/LF-P0-A3-MULTISLIT-R1/baseline/lightfringe/model.py -text -filter -ident -working-tree-encoding -eol
+/artifacts/LF-P0-A3-MULTISLIT-R1/baseline/lightfringe/rendering.py -text -filter -ident -working-tree-encoding -eol
+/artifacts/LF-P0-A3-MULTISLIT-R1/baseline/lightfringe/sampling.py -text -filter -ident -working-tree-encoding -eol
+/docs/LF-P0-A2-R1.md -text -filter -ident -working-tree-encoding -eol
+/docs/LF-P0-A3-MULTISLIT-R1.md -text -filter -ident -working-tree-encoding -eol
+/docs/LF-P0-A4-FORMAL-IMPORT.md -text -filter -ident -working-tree-encoding -eol
+/docs/MAINTENANCE.md -text -filter -ident -working-tree-encoding -eol
+/docs/SCIENTIFIC_MODEL.md -text -filter -ident -working-tree-encoding -eol
+/lightfringe/__init__.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/__main__.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/airy_main.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/airy_pdf_gui.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/airy_pdf_main.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/annotations.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/circular_gui.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/circular_model.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/circular_report.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/circular_sampling.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/gui.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/model.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/multislit.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/rendering.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/report.py -text -filter -ident -working-tree-encoding -eol
+/lightfringe/sampling.py -text -filter -ident -working-tree-encoding -eol
+/packaging/README.md -text -filter -ident -working-tree-encoding -eol
+/project-control/BASELINE-394-MAP.csv -text -filter -ident -working-tree-encoding -eol
+/project-control/BASELINE-LINK.json -text -filter -ident -working-tree-encoding -eol
+/project-control/SCIENCE-REFERENCE-REGISTER.csv -text -filter -ident -working-tree-encoding -eol
+/requirements-a4.txt -text -filter -ident -working-tree-encoding -eol
+/run.cmd -text -filter -ident -working-tree-encoding -eol
+/run.ps1 -text -filter -ident -working-tree-encoding -eol
+/runtime-a4.json -text -filter -ident -working-tree-encoding -eol
+/tests/test_export_gui.py -text -filter -ident -working-tree-encoding -eol
+/tests/test_gui.py -text -filter -ident -working-tree-encoding -eol
+/tests/test_model.py -text -filter -ident -working-tree-encoding -eol
+/tests/test_multislit.py -text -filter -ident -working-tree-encoding -eol
+/tests/test_multislit_gui_pdf.py -text -filter -ident -working-tree-encoding -eol
+/tests/test_report.py -text -filter -ident -working-tree-encoding -eol

@@ -1,0 +1,196 @@
+{
+  "Schema": "LIGHTFRINGE_MINIMAL_BASELINE_LINK/1",
+  "Project": "LightFringe",
+  "CurrentTask": "LF-GIT-SEED-01",
+  "ProjectState": "CANDIDATE_BUILT_PENDING_REVIEW",
+  "Authority": "Owner LF-GIT-SEED-01 instruction; source evidence below; no Git initialization or formal switch",
+  "FormalRoot": "F:\\DevProjects\\LightFringe",
+  "CandidateRoot": "F:\\DevProjects\\Candidates\\LightFringe\\LF-GIT-SEED-R1",
+  "BuildAuditRoot": "F:\\DevProjects\\Audits\\LightFringe\\LF-GIT-SEED-01-CANDIDATE-BUILD-R1",
+  "FormalFiles": 394,
+  "FormalDirectories": 191,
+  "SeedFiles": 48,
+  "RawExactFiles": 37,
+  "ReviewedDocumentFiles": 3,
+  "NewManagementFiles": 8,
+  "GitInitialized": false,
+  "FormalSwitched": false,
+  "RuntimeEnvironment": "F:\\DevProjects\\_Envs\\LightFringe\\A4-R1",
+  "BuildEnvironment": "F:\\DevProjects\\_Envs\\LightFringe\\A4-BUILD-R1",
+  "RequirementsSHA256": "f346e377a19a21befc5a01bed7afd14d02992aa7339e775f14b39a806ac63eb1",
+  "Guidance": "docs/MAINTENANCE.md",
+  "LastWork": "Unique 48-file isolated build; static identity checks only",
+  "NextAction": "Independent candidate review, then separately authorize Git engine/blob/checkout qualification",
+  "ProductTests": "NOT_RUN",
+  "GitEngine": "NOT_RUN",
+  "Release": "NOT_RELEASED",
+  "HistoricalNativeRootCause": "UNRESOLVED",
+  "HistoricalNativeGate": "CLOSED",
+  "StabilityToolchain": "FROZEN",
+  "ExternalEvidence": [
+    {
+      "Task": "LF-GIT-SEED-00-FILE-SELECTION-AND-COMPATIBILITY-R1",
+      "Root": "F:\\DevProjects\\_Audits\\LightFringe\\LF-GIT-SEED-00-FILE-SELECTION-AND-COMPATIBILITY-R1",
+      "Entries": 16,
+      "SealSHA256": "02f30924c2e54f2d91f4f78b5731b02172acf62feeb396dcdfe812810e0e0fbd"
+    },
+    {
+      "Task": "LF-GIT-SEED-00-DOC-CLOSURE-R1",
+      "Root": "F:\\DevProjects\\_Audits\\LightFringe\\LF-GIT-SEED-00-DOC-CLOSURE-R1",
+      "Entries": 16,
+      "SealSHA256": "105b32a2d167432500657337d264aa6ad6738afd222ae6db83e444e0e5fe608d"
+    },
+    {
+      "Task": "LF-GIT-SEED-00-INDEPENDENT-AUDIT-R2",
+      "Root": "F:\\DevProjects\\_Audits\\LightFringe\\LF-GIT-SEED-00-INDEPENDENT-AUDIT-R2",
+      "Entries": 6,
+      "SealSHA256": "122c765e07e7692a4fe11d40a1f0a4268b9685b545eb48a45a3202f54974da3f"
+    },
+    {
+      "Task": "LF-GIT-SEED-00-DOC-CLOSURE-INDEPENDENT-AUDIT-R1",
+      "Root": "F:\\DevProjects\\_Audits\\LightFringe\\LF-GIT-SEED-00-DOC-CLOSURE-INDEPENDENT-AUDIT-R1",
+      "Entries": 5,
+      "SealSHA256": "28ec422bf6db115176881697f9db72998dc56f393760e48588095f6d7be0e80a"
+    }
+  ],
+  "ReviewedDocumentTargets": [
+    {
+      "SourcePath": ".gitignore",
+      "CandidateArchivePath": "candidates/.gitignore",
+      "TargetGitPath": ".gitignore",
+      "PatchArchivePath": "diffs/gitignore.patch",
+      "OriginalSHA256": "66b166c0a8c38bba1641335f4928d619787bb6c5e310f09189da5731c49ab165",
+      "CandidateSHA256": "493414f79c20d086900c465e607e39216d9189fa0f57f9a5fff42cfc48ed6ef0",
+      "PatchSHA256": "4faaa470215fdc75bc4e4dd145248f7b14ab4fbd3eaf088ea5749a5ee6ef9c02",
+      "ReconstructedSHA256": "493414f79c20d086900c465e607e39216d9189fa0f57f9a5fff42cfc48ed6ef0",
+      "OriginalBytes": 54,
+      "CandidateBytes": 4113,
+      "PatchBytes": 4313,
+      "OriginalLines": 5,
+      "CandidateLines": 148,
+      "AddedLines": 143,
+      "RemovedLines": 0,
+      "OriginalEncoding": "UTF-8",
+      "CandidateEncoding": "UTF-8",
+      "OriginalBOM": false,
+      "CandidateBOM": false,
+      "OriginalLineEnding": "LF",
+      "CandidateLineEnding": "LF",
+      "OriginalFinalNewline": true,
+      "CandidateFinalNewline": true,
+      "Hunks": 1,
+      "ByteEqual": true,
+      "SourceTamperRejected": true,
+      "Status": "PASS"
+    },
+    {
+      "SourcePath": "README.md",
+      "CandidateArchivePath": "candidates/README.md",
+      "TargetGitPath": "README.md",
+      "PatchArchivePath": "diffs/readme.patch",
+      "OriginalSHA256": "6832b0dbbbdcd74e31e62a4cb78e430be332a0aa56e07dda676179b111587e10",
+      "CandidateSHA256": "554cdfab96f4db90d66e5a51187a78839e7eb0a093bbdd95849fb35ecfa3a3ce",
+      "PatchSHA256": "9d7dc060c15442ffd028f10eab8213e4fa1d72b098b77f6fe8140c761892cb12",
+      "ReconstructedSHA256": "554cdfab96f4db90d66e5a51187a78839e7eb0a093bbdd95849fb35ecfa3a3ce",
+      "OriginalBytes": 6276,
+      "CandidateBytes": 6446,
+      "PatchBytes": 12863,
+      "OriginalLines": 95,
+      "CandidateLines": 72,
+      "AddedLines": 44,
+      "RemovedLines": 67,
+      "OriginalEncoding": "UTF-8",
+      "CandidateEncoding": "UTF-8",
+      "OriginalBOM": false,
+      "CandidateBOM": false,
+      "OriginalLineEnding": "LF",
+      "CandidateLineEnding": "LF",
+      "OriginalFinalNewline": true,
+      "CandidateFinalNewline": true,
+      "Hunks": 1,
+      "ByteEqual": true,
+      "SourceTamperRejected": true,
+      "Status": "PASS"
+    },
+    {
+      "SourcePath": "docs/LF-P0-A4-FORMAL-IMPORT.md",
+      "CandidateArchivePath": "candidates/LF-P0-A4-FORMAL-IMPORT.md",
+      "TargetGitPath": "docs/LF-P0-A4-FORMAL-IMPORT.md",
+      "PatchArchivePath": "diffs/a4-import.patch",
+      "OriginalSHA256": "c09250c06fe5772a2871909dce13b4da76f976600d7203cef59e58bf13074ef7",
+      "CandidateSHA256": "12aa8a1c7b961a271f8d894beaa4344e95bb704847d767a6d71ccb73a29b353e",
+      "PatchSHA256": "ebd0eb1cb1b65dc4dd6cc72c7c2aa63cf18aca71d564acea1530aceb76423866",
+      "ReconstructedSHA256": "12aa8a1c7b961a271f8d894beaa4344e95bb704847d767a6d71ccb73a29b353e",
+      "OriginalBytes": 1989,
+      "CandidateBytes": 6699,
+      "PatchBytes": 8854,
+      "OriginalLines": 16,
+      "CandidateLines": 72,
+      "AddedLines": 65,
+      "RemovedLines": 9,
+      "OriginalEncoding": "UTF-8",
+      "CandidateEncoding": "UTF-8",
+      "OriginalBOM": false,
+      "CandidateBOM": false,
+      "OriginalLineEnding": "LF",
+      "CandidateLineEnding": "LF",
+      "OriginalFinalNewline": true,
+      "CandidateFinalNewline": true,
+      "Hunks": 1,
+      "ByteEqual": true,
+      "SourceTamperRejected": true,
+      "Status": "PASS"
+    }
+  ],
+  "FrozenScience": [
+    {
+      "OriginalRelativePath": "lightfringe/circular_model.py",
+      "OriginalSHA256": "c2aafe33709b6a8982c94986f4864aed566016d33cde17e78355ea84440c460d"
+    },
+    {
+      "OriginalRelativePath": "lightfringe/circular_report.py",
+      "OriginalSHA256": "259ddc5bc856ed0646bd72c4fe4a6c84bd6d170828b9b9e1df7c6ba8a6cfad55"
+    },
+    {
+      "OriginalRelativePath": "lightfringe/circular_sampling.py",
+      "OriginalSHA256": "299c9c322ea5809d85f3eaab0058c46391ee087bf9a63b6378de61a3575d3aa6"
+    }
+  ],
+  "CarryForwardCaveats": [
+    {
+      "id": "DOC-C01",
+      "severity": "MEDIUM",
+      "blocking_DOC_001": false,
+      "file": "candidates/README.md",
+      "line": 3,
+      "detail": "Original Windows10 1809+ x86_64 and machine22H2 scope omitted. Restore explicit prerequisites before release/cross-machine use. Current text limits instructions to same-machine runtime and claims no portable qualification.",
+      "source": "Original README:44; official Qt6.8 supported-platforms."
+    },
+    {
+      "id": "DOC-C02",
+      "severity": "LOW",
+      "blocking_DOC_001": false,
+      "file": "candidates/README.md",
+      "line": 54,
+      "detail": "FS-001 carried forward:8 selected compatibility references =4 directly active A2 +4 historical A3 wrapper, not8 current default active fixtures. Same overbroad comment in .gitignore:58. No path/count change."
+    },
+    {
+      "id": "DOC-C03",
+      "severity": "EVIDENCE_LIMITATION",
+      "blocking_DOC_001": false,
+      "file": "candidates/LF-P0-A4-FORMAL-IMPORT.md",
+      "line": 57,
+      "detail": "Later Owner acceptance/exact4of4 is attributed to author-window Owner decisions. Stage audits themselves state OwnerNOT_RUN. Not proof later acceptance did not happen; current audit does not certify exact4of4. Pin original Owner decision/time/SHA before archival reuse; no new Owner acceptance generated."
+    },
+    {
+      "id": "DOC-C04",
+      "severity": "LOW",
+      "blocking_DOC_001": false,
+      "file": "DOC-CLOSURE-REPORT.md",
+      "line": 15,
+      "detail": "Author checked missing independentR1, not priorR2. Current review reloaded correct R2 DOC-001 and previous-window SHA, preserving author's unavailable-input limitation."
+    }
+  ],
+  "StateMaintenance": "Read this state and docs/MAINTENANCE.md at task start; update facts/results at task end within authorized scope. No transaction manager.",
+  "IdentityDesign": "This file holds external pins and predecessor identities only; no self hash, current commit or whole-candidate manifest hash. Final 48-file manifest is external in BuildAuditRoot; no circular hash dependency."
+}

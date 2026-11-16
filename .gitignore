@@ -1,0 +1,148 @@
+# LightFringe Clean Git Seed: exact 48-path initial selection, not staging permission.
+# Root-relative exceptions use approved spelling and preserve package/fixture paths.
+# The separate SHA-bound allowlist controls file type, exact case, identity and staging.
+# Ignore rules do not untrack files and cannot prevent forced staging.
+# Lower-level ignore files, attributes and content filters require separate verification.
+#
+# Default deny applies at every depth, including unknown environment/directory names.
+# Do not replace it with broad !*.py, !lightfringe/** or !artifacts/** exceptions.
+*
+
+# Root launch, dependency, documentation and Git controls (9 exact files).
+!/.gitattributes
+!/.gitignore
+!/CHANGELOG.md
+!/README.md
+!/THIRD-PARTY-NOTICES.md
+!/requirements-a4.txt
+!/run.cmd
+!/run.ps1
+!/runtime-a4.json
+
+# All 16 accepted product modules; retain the root package topology.
+!/lightfringe/
+!/lightfringe/__init__.py
+!/lightfringe/__main__.py
+!/lightfringe/airy_main.py
+!/lightfringe/airy_pdf_gui.py
+!/lightfringe/airy_pdf_main.py
+!/lightfringe/annotations.py
+!/lightfringe/circular_gui.py
+!/lightfringe/circular_model.py
+!/lightfringe/circular_report.py
+!/lightfringe/circular_sampling.py
+!/lightfringe/gui.py
+!/lightfringe/model.py
+!/lightfringe/multislit.py
+!/lightfringe/rendering.py
+!/lightfringe/report.py
+!/lightfringe/sampling.py
+
+# Six original test sources; retain assertions and root-relative topology.
+!/tests/
+!/tests/test_export_gui.py
+!/tests/test_gui.py
+!/tests/test_model.py
+!/tests/test_multislit.py
+!/tests/test_multislit_gui_pdf.py
+!/tests/test_report.py
+
+# Five exact product/maintenance documents.
+!/docs/
+!/docs/LF-P0-A2-R1.md
+!/docs/LF-P0-A3-MULTISLIT-R1.md
+!/docs/LF-P0-A4-FORMAL-IMPORT.md
+!/docs/MAINTENANCE.md
+!/docs/SCIENTIFIC_MODEL.md
+
+# Eight active fixtures: open all ancestors, then only exact input files.
+!/artifacts/
+!/artifacts/LF-P0-A2-R1/
+!/artifacts/LF-P0-A2-R1/baseline/
+!/artifacts/LF-P0-A2-R1/baseline/lightfringe/
+!/artifacts/LF-P0-A3-MULTISLIT-R1/
+!/artifacts/LF-P0-A3-MULTISLIT-R1/baseline/
+!/artifacts/LF-P0-A3-MULTISLIT-R1/baseline/lightfringe/
+!/artifacts/LF-P0-A2-R1/BEGIN_nominal_outputs.json
+!/artifacts/LF-P0-A2-R1/baseline/lightfringe/model.py
+!/artifacts/LF-P0-A2-R1/baseline/lightfringe/rendering.py
+!/artifacts/LF-P0-A2-R1/baseline/lightfringe/sampling.py
+!/artifacts/LF-P0-A3-MULTISLIT-R1/BEGIN_nominal_outputs.json
+!/artifacts/LF-P0-A3-MULTISLIT-R1/baseline/lightfringe/model.py
+!/artifacts/LF-P0-A3-MULTISLIT-R1/baseline/lightfringe/rendering.py
+!/artifacts/LF-P0-A3-MULTISLIT-R1/baseline/lightfringe/sampling.py
+
+# Three minimal project-control indexes, not live audit/control storage.
+!/project-control/
+!/project-control/BASELINE-394-MAP.csv
+!/project-control/BASELINE-LINK.json
+!/project-control/SCIENCE-REFERENCE-REGISTER.csv
+
+# Packaging boundary documentation only; no generated build files.
+!/packaging/
+!/packaging/README.md
+
+# No exceptions for the 23 CONDITIONAL paths: 14 NPZ/CSV references, eight scripts,
+# and test.ps1. No exceptions for the other 331 excluded historical files.
+# Named environment guards apply at any depth; unknown names remain denied by *.
+.venv/
+venv/
+env/
+A4-R1/
+A4-BUILD-R1/
+_Envs/
+_Candidates/
+_Audits/
+
+# Python/tool caches and native/build products at any depth.
+# Native suffix case is explicit; all unlisted paths remain denied by *.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+*.egg-info/
+.coverage
+htmlcov/
+build/
+dist/
+*.build/
+*.dist/
+*.onefile-build/
+*.spec
+*.whl
+*.[dD][lL][lL]
+*.[pP][yY][dD]
+*.[eE][xX][eE]
+*.[oO][bB][jJ]
+*.[lL][iI][bB]
+*.[eE][xX][pP]
+*.[iI][lL][kK]
+*.[pP][dD][bB]
+
+# Temporary files and user/editor configuration at any depth.
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.env
+.env.*
+*.local
+*.local.*
+.idea/
+.vscode/
+
+# Accidental task/audit/control copies are never seed authority or source inputs.
+/run-output/
+/task-output/
+/LPM/
+/transactions/
+/journal/
+/CURRENT.json
+/PROJECT-STATE.json
+# Do not add blanket artifacts/, *.json, *.csv or *.npz rules after the exact fixtures.
+# Future files require an explicit selection revision plus exact exceptions.

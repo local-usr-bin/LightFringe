@@ -1,0 +1,66 @@
+[
+  {
+    "mode": "single",
+    "inputs": [
+      5.5e-07,
+      3e-05,
+      0.00015,
+      1.0
+    ],
+    "intensity_10001_sha256": "49097e4c09e17da58bf0df0ee08893ad709a1c97f7db9d99d317d064c1ac9f7f",
+    "arrays": {
+      "x": "ebd83cc161d57572d27a25d59f190b994bf8a4569e85b80bc362f59da0db4ef8",
+      "intensity": "68a3c1b2c6bcde95b1ad050e9d481d821918f9cbacde018403a92c10fa0dfcca",
+      "envelope": "39279eea38cbab813704e40342200f5756ebda1ab46f05a2daf434e400ab094c",
+      "pixel_mean": "2f41e8e00e3007cff758b791cf581cb941c6badc880a4bc9d3e01fdbb45e61d1"
+    }
+  },
+  {
+    "mode": "single",
+    "inputs": [
+      6.3e-07,
+      4e-05,
+      0.00014,
+      1.7
+    ],
+    "intensity_10001_sha256": "c24332cbf9244eda0ebb473db7d6f51b7b8ecc3c25834c6883c8e7dba37d1ad9",
+    "arrays": {
+      "x": "ebd83cc161d57572d27a25d59f190b994bf8a4569e85b80bc362f59da0db4ef8",
+      "intensity": "3ea0314da689eb6b603286a7e162b386cad543190a04399e085ece68fb631c86",
+      "envelope": "1c98f794803227b41bbeb4cf888a44710132f5b03a6bc9dd654f0b50f96253a8",
+      "pixel_mean": "4b2d7c42445e65fdb4455efa5bfa6dc2ff5aac171bba0e77456489f61288c6e5"
+    }
+  },
+  {
+    "mode": "double",
+    "inputs": [
+      5.5e-07,
+      3e-05,
+      0.00015,
+      1.0
+    ],
+    "intensity_10001_sha256": "4b5a008ab60902d3c56a2b10908817a67f94b4b0fdc26640494467936a117b30",
+    "arrays": {
+      "x": "ebd83cc161d57572d27a25d59f190b994bf8a4569e85b80bc362f59da0db4ef8",
+      "intensity": "e18155746928f8393c0aa162fdd1d705c5702e26c41463af0cef45b96d862aa9",
+      "envelope": "39279eea38cbab813704e40342200f5756ebda1ab46f05a2daf434e400ab094c",
+      "pixel_mean": "61b293c543cba39ab201df06b008a92ce136a9854a85121b3162a56d9455b1cc"
+    }
+  },
+  {
+    "mode": "double",
+    "inputs": [
+      6.3e-07,
+      4e-05,
+      0.00014,
+      1.7
+    ],
+    "intensity_10001_sha256": "547ad0dd551f127aff9333e6996009ff98aaf21049b168e29d66c19949716617",
+    "arrays": {
+      "x": "ebd83cc161d57572d27a25d59f190b994bf8a4569e85b80bc362f59da0db4ef8",
+      "intensity": "9d31aa4595321f76267a3c94ea5de5cc0c57b9052773b94ca3376eba2289ef08",
+      "envelope": "1c98f794803227b41bbeb4cf888a44710132f5b03a6bc9dd654f0b50f96253a8",
+      "pixel_mean": "2765c0e70c792f8c293a48915f93d734d6760bfb2b9d0df0c00f38dc6912ac6c"
+    }
+  }
+]
