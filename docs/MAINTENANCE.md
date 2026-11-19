@@ -8,6 +8,7 @@ PUBLIC_RELEASE=HOLD，计划local-usr-bin/LightFringe；无远程/Tag/Push/Relea
 
 .gitignore精确白名单不代替实际审核，也不能停止跟踪旧文件。.gitattributes明确unset text/filter/ident/working-tree-encoding/eol，新路径逐项列明。提交检查实际ignore/attrs、路径和blob原字节；不用-f绕过，不改global/system配置或Git身份。
 不纳入Runtime/原生二进制、环境缓存、截图/审计大包、凭据或构建产物。新目录不含下划线，既有/上游拓扑不改。
+不擅自修改持久User/Machine PATH、注册表或系统策略。Process PATH与持久PATH分别记录。
 源运行与路径见README；原run.cmd/ps1及runtime-a4身份保留，换环境需明确核验。
 正式394旧工程、A4-R1/A4-BUILD-R1及历史原件不改、不搬迁。普通授权开发做针对性测试，重大科学/依赖更新需新环境及科学/原生/GUI/PDF/许可验证，不改容差/断言求全绿。
 本轮只有静态与Git字节检查；不运行应用、科学/GUI/PDF或Qt替换，不构建、不安装。
