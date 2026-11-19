@@ -1,0 +1,7 @@
+{
+  "source": ".",
+  "scripts": "packaging/gui-r1",
+  "hooks": "packaging/gui-r1/hooks",
+  "audit": "build-output/gui-r1/evidence",
+  "build_env": null
+}

@@ -1,5 +1,5 @@
-# LightFringe initial 48-file seed: preserve recorded bytes.
-# Static policy only; effective Git attributes, blob and checkout bytes remain unqualified.
+# LightFringe source snapshot: preserve raw bytes for historical and new reviewed paths.
+# Baseline Git byte qualification is historical; this snapshot rechecks effective attributes and new blobs.
 # Explicit unset differs from unspecified. Never add LFS/clean/encoding transforms silently.
 * -text -filter -ident -working-tree-encoding -eol
 
@@ -52,3 +52,19 @@
 /tests/test_multislit.py -text -filter -ident -working-tree-encoding -eol
 /tests/test_multislit_gui_pdf.py -text -filter -ident -working-tree-encoding -eol
 /tests/test_report.py -text -filter -ident -working-tree-encoding -eol
+
+# Exact approved source snapshot additions; never enable content filters silently.
+/LICENSE -text -filter -ident -working-tree-encoding -eol
+/references/README.md -text -filter -ident -working-tree-encoding -eol
+/references/numerical-reference.json -text -filter -ident -working-tree-encoding -eol
+/references/independent-science.json -text -filter -ident -working-tree-encoding -eol
+/docs/SOURCE-RELEASE.md -text -filter -ident -working-tree-encoding -eol
+/packaging/gui-r1/README.md -text -filter -ident -working-tree-encoding -eol
+/packaging/gui-r1/LightFringe.spec -text -filter -ident -working-tree-encoding -eol
+/packaging/gui-r1/launcher.py -text -filter -ident -working-tree-encoding -eol
+/packaging/gui-r1/early-origin-hook.py -text -filter -ident -working-tree-encoding -eol
+/packaging/gui-r1/lfdiagnostics.py -text -filter -ident -working-tree-encoding -eol
+/packaging/gui-r1/releasechecks.py -text -filter -ident -working-tree-encoding -eol
+/packaging/gui-r1/version-resource.txt -text -filter -ident -working-tree-encoding -eol
+/packaging/gui-r1/hooks/hook-PySide6.QtGui.py -text -filter -ident -working-tree-encoding -eol
+/packaging/gui-r1/build-roots.example.json -text -filter -ident -working-tree-encoding -eol

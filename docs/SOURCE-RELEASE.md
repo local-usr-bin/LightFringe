@@ -1,0 +1,18 @@
+# 1.0源码快照与封存EXE
+计划local-usr-bin/LightFringe；本提交为本地源码快照，尚无远程、Tag或公开Release。
+
+起点：main根提交84e118d9a95b27858bfeff17b96feb5104b97be1。16产品模块采用封存GUI-R1实际输入，仅三份已批准的标识后继不同：
+- __init__.py：62b6f4232e8d521cf8d344eeab563a8d2c3c299acfc2fed2316798a15e260421
+- gui.py：d2dd428b863c2a7d649ec995bfd7d248c6e3328dca65ab147958e150380380a8
+- report.py：7a320be7de1f4b9ed5ab75d798b04c01432150009b09e1243580572cb203a002
+其余13模块、三冻结科学核心、原测试/八夹具不变。
+现EXE SHA256：88b4c2dd324591aa3487358a74b7f07741b55d1a1d5c1fc9811239c7b99b4278。
+最终二进制ZIP SHA256：742f9e196fe589468c2ef9e6b26d7c910a3ad760f4d8d241be59bad1890cd91e，本轮不改。
+
+产品源文件逐项匹配；历史GUI-R1对14个实际嵌入产品模块递归比较仅忽略co_filename。本轮不重新运行EXE，不声称适配spec已重建验证。
+现程序使用GUI-R1窗口/Runtime布局、支持Python外置和五官方VC装配。packaging/gui-r1保留7份材料，仅列明路径/注释适配；外部原生环境、两NumPy PE预处理、OpenSSL/VC来源及文档/源档装配不由本库代替。
+这不是无需准备即可完整构建的封闭输入集合，也不保证同SHA二进制。
+
+自有MIT与两JSON授权落实；六第三方源码档仍随二进制ZIP，不由GitHub自动仓库源码附件替代。
+Win10功能/PDF NOT_RUN、未捕获退出码UNKNOWN、历史原生根因UNRESOLVED保持。本轮只静态，不新增动态或法律PASS。
+PUBLIC_RELEASE=HOLD；仅本地正常新提交和审阅ZIP获授权。后续远程、Tag、Push和同期源码/二进制Release需Owner另行授权，不改历史。

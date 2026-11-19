@@ -1,5 +1,12 @@
 # 变更记录
 
+## 1.0.0 / B0 — 本地源码发行快照（2026-11-19，未公开）
+- 同步三份已批准1.0标识后继，其余13产品模块、科学核心、旧测试/八项夹具原字节。
+- 新增标准MIT及Owner授权的两JSON原字节，署名猫太郎、公开联系233345754@qq.com；第三方边界保持。
+- 收入GUI-R1实际入口/spec/hook/版本资源/诊断源码；只作列明路径与注释适配，外部原生输入仍须准备，不声称完整一键构建或同SHA重建。
+- 本轮只有静态与Git对象字节验证，没有构建、应用/GUI/VM、科学/PDF/Qt替换复验。Win10功能/PDF NOT_RUN、未知退出码UNKNOWN、原生根因UNRESOLVED不变。
+- 计划local-usr-bin/LightFringe，PUBLIC_RELEASE=HOLD；无远程、Tag、Push或Release。后续公开另行授权。以下保留各历史阶段。
+
 ## 未发行 — Clean Git Seed候选（2026-11-17）
 
 - 按LF-GIT-SEED-01建立唯一48文件隔离候选：37项原字节、3项已复审文档后继、8项新管理文件。
@@ -11,4 +18,4 @@
 
 A1单/双缝、A2旧模式PDF、A3多缝、A4圆孔GUI与独立383网格PDF均来自正式工程。本文件不重新认证这些阶段；原始结果按外部封存任务与各自SHA解释。
 
-现有代码标签仍为0.2.0、LF-P0-A3-MULTISLIT-R1，保持原字节。A4正式导入范围ADD10/MODIFY4/PRESERVE380，正式集合394文件/191目录；后续独审及Owner风险接受见BASELINE-LINK.json索引。历史原生根因仍UNRESOLVED，风险接受没有改写技术门禁。当前未建立任何Git提交历史。
+种子建立时的历史代码标签为0.2.0、LF-P0-A3-MULTISLIT-R1。A4正式导入范围ADD10/MODIFY4/PRESERVE380，正式集合394文件/191目录；后续独审及Owner风险接受由源码仓库project-control/BASELINE-LINK.json历史索引追溯，该索引不随绿色应用包交付。历史原生根因仍UNRESOLVED，风险接受没有改写技术门禁。当时未建立Git历史；现已从84e118d9根基线通过正常新提交收口1.0，不改写历史。

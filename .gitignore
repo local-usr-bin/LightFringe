@@ -1,4 +1,4 @@
-# LightFringe Clean Git Seed: exact 48-path initial selection, not staging permission.
+# LightFringe source snapshot: historical 48 paths plus reviewed explicit additions; not staging permission.
 # Root-relative exceptions use approved spelling and preserve package/fixture paths.
 # The separate SHA-bound allowlist controls file type, exact case, identity and staging.
 # Ignore rules do not untrack files and cannot prevent forced staging.
@@ -146,3 +146,25 @@ dist/
 /PROJECT-STATE.json
 # Do not add blanket artifacts/, *.json, *.csv or *.npz rules after the exact fixtures.
 # Future files require an explicit selection revision plus exact exceptions.
+
+# Local build configuration and generated output remain excluded.
+build-roots.local.json
+build-output/
+# Exact additions approved for LF-SOURCE-RELEASE-SNAPSHOT-R1 (spec exception follows *.spec).
+!/references/
+!/packaging/gui-r1/
+!/packaging/gui-r1/hooks/
+!/LICENSE
+!/references/README.md
+!/references/numerical-reference.json
+!/references/independent-science.json
+!/docs/SOURCE-RELEASE.md
+!/packaging/gui-r1/README.md
+!/packaging/gui-r1/LightFringe.spec
+!/packaging/gui-r1/launcher.py
+!/packaging/gui-r1/early-origin-hook.py
+!/packaging/gui-r1/lfdiagnostics.py
+!/packaging/gui-r1/releasechecks.py
+!/packaging/gui-r1/version-resource.txt
+!/packaging/gui-r1/hooks/hook-PySide6.QtGui.py
+!/packaging/gui-r1/build-roots.example.json

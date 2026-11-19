@@ -1,0 +1,16 @@
+# Version resource used by the sealed GUI-R1 build; values unchanged in this source snapshot.
+VSVersionInfo(
+ ffi=FixedFileInfo(filevers=(1,0,0,0),prodvers=(1,0,0,0),
+ mask=0x3f,flags=0x2,OS=0x40004,fileType=0x1,subtype=0x0,date=(0,0)),
+ kids=[
+  StringFileInfo([StringTable('040904B0',[
+   StringStruct('FileDescription','光纹 LightFringe'),
+   StringStruct('FileVersion','1.0.0'),
+   StringStruct('InternalName','LightFringe'),
+   StringStruct('OriginalFilename','LightFringe.exe'),
+   StringStruct('ProductName','LightFringe'),
+   StringStruct('ProductVersion','1.0.0'),
+   StringStruct('SpecialBuild','LF-1.0-B0-CANDIDATE-R1')
+  ])]),
+  VarFileInfo([VarStruct('Translation',[0x0409,1200])])
+ ])

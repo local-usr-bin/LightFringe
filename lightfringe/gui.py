@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 from .model import Mode, ModelError, Parameters
 from .multislit import MultiParameters, is_multi, prepare_display, characteristic_lengths
 from .rendering import curve_vertex_indices
-from . import __build__
+from . import __version__, __build__
 from .annotations import missing_order_note
 from .report import ReportError, capture_snapshot, write_pdf
 
@@ -347,7 +347,7 @@ class Apparatus(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"光纹 LightFringe · {__build__}")
+        self.setWindowTitle(f"光纹 LightFringe {__version__} · {__build__}")
         self.resize(1220, 820)
         self.setMinimumSize(980, 660)
         self.setStyleSheet("QMainWindow {background:#f2f5f8;} QLabel{color:#203448;}"
@@ -359,7 +359,7 @@ class MainWindow(QMainWindow):
         title = QLabel("光纹  LightFringe")
         title.setStyleSheet("font-size:24px;font-weight:600;padding:5px;")
         layout.addWidget(title)
-        subtitle = QLabel("波动光学实验 · P0    |    夫琅禾费远场 · 相干、单色、等幅照明")
+        subtitle = QLabel(f"波动光学实验 · {__version__}    |    夫琅禾费远场 · 相干、单色、等幅照明")
         layout.addWidget(subtitle)
         body = QHBoxLayout()
         layout.addLayout(body, 1)

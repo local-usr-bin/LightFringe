@@ -80,7 +80,7 @@ def capture_snapshot(params: Parameters, data: DisplayData, revision: int,
         digest.update(np.asarray(a, dtype=np.float64).tobytes())
     zero, fringe = characteristic_lengths(params)
     software = (f"光纹 LightFringe {__version__} ({__build__})" if is_multi(params) else
-                f"光纹 LightFringe {__version__} · A3（核心基线 {__baseline__}）")
+                f"光纹 LightFringe {__version__} · {__build__}（核心基线 {__baseline__}）")
     return ReportSnapshot(params, frozen, revision, local_now(), software,
                           width_um, separation_um, zero, fringe, digest.hexdigest())
 
