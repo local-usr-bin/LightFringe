@@ -7,7 +7,8 @@
 - report.py：7a320be7de1f4b9ed5ab75d798b04c01432150009b09e1243580572cb203a002
 其余13模块、三冻结科学核心、原测试/八夹具不变。
 现EXE SHA256：88b4c2dd324591aa3487358a74b7f07741b55d1a1d5c1fc9811239c7b99b4278。
-最终二进制ZIP SHA256：742f9e196fe589468c2ef9e6b26d7c910a3ad760f4d8d241be59bad1890cd91e，本轮不改。
+历史父ZIP（LF-RELEASE-FINAL-SEAL-R1）SHA256：742f9e196fe589468c2ef9e6b26d7c910a3ad760f4d8d241be59bad1890cd91e；它不是同期最终Windows发行ZIP。
+获准公开时的最终Windows ZIP文件名、大小及SHA256，以同期Release正文及包外SHA256SUMS.txt清单为准。当前PUBLIC_RELEASE=HOLD；本Git源码文档不嵌入当前最终Windows ZIP的SHA，保持源码提交/源码ZIP到绿色版文档、Windows ZIP和包外交付清单的单向身份关联，避免循环引用。
 
 产品源文件逐项匹配；历史GUI-R1对14个实际嵌入产品模块递归比较仅忽略co_filename。本轮不重新运行EXE，不声称适配spec已重建验证。
 现程序使用GUI-R1窗口/Runtime布局、支持Python外置和五官方VC装配。packaging/gui-r1保留7份材料，仅列明路径/注释适配；外部原生环境、两NumPy PE预处理、OpenSSL/VC来源及文档/源档装配不由本库代替。
