@@ -7,10 +7,13 @@ from dataclasses import dataclass
 from pathlib import Path
 import hashlib,json
 import numpy as np
-from PySide6.QtCore import QBuffer,QIODevice,QMarginsF,QPointF,QRectF,Qt,QSaveFile
-from PySide6.QtGui import QPdfWriter,QPageSize,QPageLayout,QPainter,QFont,QFontMetricsF,QColor,QPen,QImage,QPolygonF
-from . import __version__,__build__
+from PySide6.QtCore import QBuffer,QIODevice,QRectF,Qt,QSaveFile
+from PySide6.QtGui import QPdfWriter,QPainter,QPen,QImage
 from .report import ReportError,local_now
+from .report_layout import (
+    MUTED, NORMALIZATION, RULE, SOFT, SOFTWARE, Page,
+    apparatus, configure_writer, draw_profile,
+)
 from .circular_model import CircularParameters,ModelStatus,RingVisibility,assess_model,observation_half_span,first_dark_radius,first_ring_visibility
 from .circular_sampling import MAX_SCREEN_SIDE,DisplayStatus,assess_sampling,prepare_screen,prepare_profile
 
@@ -75,7 +78,7 @@ class CircularReportSnapshot:
 def capture_request(params):
     eligibility=assess_pdf(params)
     if not eligibility.allowed:raise CircularReportError(eligibility.reason,eligibility.status)
-    return CircularReportRequest(params,eligibility,local_now(),f'光纹 LightFringe {__version__} / build {__build__}')
+    return CircularReportRequest(params,eligibility,local_now(),SOFTWARE)
 
 def data_digest(params,screen,profile):
     h=hashlib.sha256(json.dumps(dict(wavelength=params.wavelength,diameter=params.diameter,distance=params.distance),sort_keys=True).encode())
@@ -118,155 +121,130 @@ def display_image(snapshot):
 
 class PageLayoutError(CircularReportError):pass
 
-class Page:
-    def __init__(self,painter,width,height,number,ledger):
-        self.p=painter;self.w=width;self.h=height;self.number=number;self.ledger=ledger
-    def font(self,size,bold=False):
-        f=QFont('Microsoft YaHei UI');f.setPointSizeF(size);f.setBold(bold);return f
-    def measure(self,value,width,size=10.5,bold=False):
-        f=self.font(size,bold);m=QFontMetricsF(f,self.p.device())
-        return m.boundingRect(QRectF(0,0,width,10000),int(Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop|Qt.TextFlag.TextWordWrap),value)
-    def text(self,key,rect,value,size=10.5,bold=False,align=Qt.AlignmentFlag.AlignLeft):
-        self.p.setFont(self.font(size,bold));self.p.setPen(QColor('#203448'))
-        flags=int(align|Qt.AlignmentFlag.AlignTop|Qt.TextFlag.TextWordWrap)
-        bounds=QFontMetricsF(self.p.font(),self.p.device()).boundingRect(rect,flags,value)
-        if bounds.width()>rect.width()+.1 or bounds.height()>rect.height()+.1:
-            raise PageLayoutError(f'文字区域不足，未缩小字体：{key} {bounds.width():.2f}x{bounds.height():.2f} > {rect.width():.2f}x{rect.height():.2f}')
-        if rect.left()<0 or rect.top()<0 or rect.right()>self.w+.01 or rect.bottom()>self.h+.01:
-            raise PageLayoutError('文字越过页面有效绘制区域：'+key)
-        for old in self.ledger:
-            if old['page']==self.number and old['kind']=='text':
-                overlap=bounds.intersected(QRectF(*old['bounds']))
-                if overlap.width()>.1 and overlap.height()>.1:raise PageLayoutError('文字重叠：'+key+' / '+old['key'])
-        self.ledger.append(dict(page=self.number,kind='text',key=key,text=value,font_pt=size,
-            rect=[rect.x(),rect.y(),rect.width(),rect.height()],bounds=[bounds.x(),bounds.y(),bounds.width(),bounds.height()]))
-        self.p.drawText(rect,flags,value)
-    def graphic(self,key,rect,**extra):
-        if rect.left()<0 or rect.top()<0 or rect.right()>self.w+.01 or rect.bottom()>self.h+.01:raise PageLayoutError('图形越过有效区域：'+key)
-        self.ledger.append(dict(page=self.number,kind='graphic',key=key,rect=[rect.x(),rect.y(),rect.width(),rect.height()],**extra))
-    def footer(self,total):
-        self.text('footer',QRectF(0,self.h-14,self.w,14),f'光纹 | 数值模拟，非实测 | 第{self.number}页 / 共{total}页',9.5,align=Qt.AlignmentFlag.AlignHCenter)
+EXPERIMENT_TITLE = "圆孔夫琅禾费衍射"
+LIMITS = ("理想圆孔、单色相干均匀平面波垂直入射。采用标量、傍轴、夫琅禾费远场模型。"
+          "F = (D/2)²/(λ z) ≤ 0.05，ρ/z ≤ 0.05。门槛不等于固定的强度误差百分比。"
+          f"{NORMALIZATION}模型未包含近场、像差、偏振及绝对屏面照度。")
 
-SCIENCE_TEXT=(
- 'I(ρ)/I(0) = [2 J1(u)/u]^2；u = π D ρ/(λ z)；ρ = sqrt(x^2+y^2)。\n'
- 'u=0取极限1。J1为一阶贝塞尔函数；D为圆孔直径。\n'
- '理想圆孔、单色相干均匀平面波垂直入射；标量、傍轴夫琅禾费远场。\n'
- 'F=(D/2)^2/(λz)≤0.05；ρ/z≤0.05。门槛不等于固定的强度误差百分比。\n'
- '本报告为数值模拟结果，并非实测数据。\n'
- '光强相对I(0)归一化；不同参数峰值不能比较实际透射光功率。\n'
- '二维为2×2 Gauss像素面积均值，灰度仅辅助；截面为线性连续点值。\n'
- '计算未包含近场、像差、偏振及绝对屏面照度。')
 
-def page_one(page,s,total):
-    p=s.params;W=page.w
-    page.text('title',QRectF(0,0,W,30),'《光纹》光学模拟报告',20,True)
-    page.text('model',QRectF(0,37,W,19),'圆孔夫琅禾费衍射 / Airy pattern',12.5,True)
-    page.text('generation',QRectF(0,64,W,16),f'PDF生成时间：{s.generated_at:%Y-%m-%d %H:%M:%S} +08:00')
-    page.text('software',QRectF(0,84,W,16),s.request.software)
-    page.text('parameters',QRectF(0,111,W,17),f'波长 λ = {p.wavelength*1e9:g} nm    圆孔直径 D = {p.diameter*1e6:g} μm    屏距 z = {p.distance:.2f} m',11)
-    page.text('range',QRectF(0,133,W,17),f'观察范围：x、y各 [-{s.half_span_m*1000:.6f}, +{s.half_span_m*1000:.6f}] mm')
-    e=s.request.eligibility
-    state=(f'F = {e.model.fresnel_number:.8f} ≤ 0.05；模型适用性：通过；傍轴范围已检查。\n'
-      f'第一暗环理论半径：{s.first_dark_radius_m*1000:.6f} mm；{RING_TEXT[s.visibility]}。\n'
-      f'二维科学计算网格：383×383；所需 {e.sampling.required_count}×{e.sampling.required_count}；最短周期 {e.sampling.pixels_per_period:.2f} 像素。')
-    page.text('science-state',QRectF(0,159,W,64),state)
-    page.text('screen-title',QRectF(0,236,W,18),'二维艾里斑观察屏',12.5,True)
-    square=QRectF((W-360)/2,280,360,360);page.graphic('airy-image',square,source_grid=[383,383],isotropic=True)
-    page.p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform,False)
-    page.p.drawImage(square,display_image(s))
-    page.p.setPen(QPen(QColor('#8697a6'),.6));page.p.drawRect(square)
-    page.text('y-unit',QRectF(0,255,65,15),'y / mm',10.5,align=Qt.AlignmentFlag.AlignRight)
-    for i,f in enumerate((0.,.5,1.)):
-        x=square.left()+f*square.width();y=square.bottom()-f*square.height()
-        value=f'{(2*f-1)*s.half_span_m*1000:.3f}'
-        page.text('screen-x-tick-'+str(i),QRectF(x-32,647,64,15),value,10.5,align=Qt.AlignmentFlag.AlignHCenter)
-        page.text('screen-y-tick-'+str(i),QRectF(0,y-7,65,15),value,10.5,align=Qt.AlignmentFlag.AlignRight)
-    page.text('x-unit',QRectF(square.left(),670,square.width(),18),'x / mm',10.5,align=Qt.AlignmentFlag.AlignHCenter)
-    page.text('gray-note',QRectF(0,698,W,34),
-        '灰度 = sqrt(像素面积平均 I/I(0))，仅辅助观察，RGB并非实测光强。\n页面缩放不增加383×383网格的科学信息；图中x、y比例相同。')
+def page_one(page, s, total):
+    p = s.params
+    e = s.request.eligibility
+    span_mm = s.half_span_m * 1000
+    page.header(EXPERIMENT_TITLE, s.request.software, s.generated_at)
+    page.heading("inputs", 123, "输入参数")
+    page.cards("inputs", 146, 47, [
+        ("波长 λ", f"{p.wavelength*1e9:g} nm"),
+        ("圆孔直径 D", f"{p.diameter*1e6:g} μm"),
+        ("屏距 z", f"{p.distance:.2f} m"),
+    ])
+    page.heading("results", 201, "关键结果")
+    page.cards("results", 224, 49, [
+        ("第一暗环理论半径", f"{s.first_dark_radius_m*1000:.6f} mm"),
+        ("x、y 各自观察半宽", f"±{span_mm:.6f} mm"),
+        ("二维科学计算网格", f"{PDF_GRID} × {PDF_GRID}"),
+    ], results=True)
+    page.text("science-state", QRectF(0, 280, page.w, 27),
+              f"{RING_TEXT[s.visibility]}。F = {e.model.fresnel_number:.8f} ≤ 0.05。"
+              "远场与傍轴检查通过。", color=MUTED)
+
+    page.heading("screen-title", 307, "二维艾里斑观察屏")
+    page.text("gray-note", QRectF(166, 311, page.w-166, 19),
+              "灰度 = √(像素面积平均 I/I(0))，仅辅助观察。",
+              9.5, align=Qt.AlignmentFlag.AlignRight, color=MUTED)
+    # In page points this is close to the original 360 pt square. The embedded
+    # 383 × 383 scientific image and the horizontal/vertical scale are retained.
+    side = 349
+    square = QRectF((page.w-side)/2, 335, side, side)
+    page.graphic("airy-image", square, source_grid=[PDF_GRID, PDF_GRID], isotropic=True)
+    page.p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
+    page.p.drawImage(square, display_image(s))
+    page.p.setPen(QPen(RULE, .7))
+    page.p.drawRect(square)
+    page.text("y-unit", QRectF(0, square.top()+17, square.left()-7, 18), "y / mm",
+              9.5, align=Qt.AlignmentFlag.AlignRight, color=MUTED)
+    for i, fraction in enumerate((0., .5, 1.)):
+        x = square.left() + fraction * square.width()
+        y = square.bottom() - fraction * square.height()
+        label = f"{(2*fraction-1)*span_mm:.3f}"
+        page.text(f"screen-x-tick-{i}", QRectF(x-26, square.bottom()+8, 52, 16), label,
+                  9.5, align=Qt.AlignmentFlag.AlignHCenter, color=MUTED)
+        page.text(f"screen-y-tick-{i}", QRectF(0, y-7, square.left()-7, 17), label,
+                  9.5, align=Qt.AlignmentFlag.AlignRight, color=MUTED)
+    page.text("x-unit", QRectF(square.left(), square.bottom()+22, square.width(), 17),
+              "x / mm · x、y 等比例", 9.5, align=Qt.AlignmentFlag.AlignHCenter, color=MUTED)
     page.footer(total)
 
-def diagrams(page,s):
-    p=page.p;page.text('diagram-heading',QRectF(0,418,page.w,20),'圆孔与光学装置示意（不按比例）',12.5,True)
-    page.text('front-label',QRectF(0,445,182,16),'圆孔正面',10.5)
-    page.text('device-label',QRectF(213,445,page.w-213,16),'均匀平面波垂直入射',10.5)
-    opening=QRectF(60,468,48,48);page.graphic('aperture-circle',opening,isotropic=True)
-    p.setPen(QPen(QColor('#526477'),.8));p.setBrush(QColor('#ffffff'));p.drawEllipse(opening);p.setBrush(Qt.BrushStyle.NoBrush)
-    p.setPen(QPen(QColor('#1266a6'),.8))
-    left,right,cy=opening.left(),opening.right(),opening.center().y()
-    p.drawLine(QPointF(left,cy),QPointF(right,cy))
-    for x in (left,right):p.drawLine(QPointF(x,cy),QPointF(x,534));p.drawLine(QPointF(x,529),QPointF(x,537))
-    p.drawLine(QPointF(left,533),QPointF(right,533))
-    page.text('diameter-label',QRectF(0,541,182,16),f'D = {s.params.diameter*1e6:g} μm',10.5,align=Qt.AlignmentFlag.AlignHCenter)
-    page.ledger.append(dict(page=page.number,kind='geometry',key='diameter-endpoints',
-        opening=[opening.x(),opening.y(),opening.width(),opening.height()],start=[left,cy],end=[right,cy]))
-    board,screen=273.,page.w-30
-    p.setPen(QPen(QColor('#8697a6'),1.1))
-    for x in (board,screen):p.drawLine(QPointF(x,474),QPointF(x,519))
-    p.fillRect(QRectF(board-2,491,4,12),QColor('#ffffff'));p.setPen(QPen(QColor('#1266a6'),.8))
-    for y in (483.,496.,509.):
-        p.drawLine(QPointF(223,y),QPointF(board-12,y));p.drawLine(QPointF(board-16,y-3),QPointF(board-12,y));p.drawLine(QPointF(board-16,y+3),QPointF(board-12,y))
-    p.drawLine(QPointF(board+15,497),QPointF(screen-12,497))
-    page.text('distance-label',QRectF(board+18,474,screen-board-35,17),f'z = {s.params.distance:.2f} m',10.5,align=Qt.AlignmentFlag.AlignHCenter)
-    page.text('board-label',QRectF(board-35,525,70,16),'圆孔板',10.5,align=Qt.AlignmentFlag.AlignHCenter)
-    page.text('observation-label',QRectF(screen-30,525,60,16),'观察屏',10.5,align=Qt.AlignmentFlag.AlignHCenter)
 
-def page_two(page,s,total,third):
-    page.text('page2-title',QRectF(0,0,page.w,28),'过圆心截面与实验说明',17,True)
-    p=s.params
-    page.text('page2-parameters',QRectF(0,36,page.w,17),f'λ={p.wavelength*1e9:g} nm；D={p.diameter*1e6:g} μm；z={p.distance:.2f} m；二维网格383×383')
-    page.text('curve-title',QRectF(0,63,page.w,18),'一维相对光强 I(x,0)/I(0)',12.5,True)
-    rect=QRectF(58,96,page.w-98,208);page.graphic('linear-profile',rect,point_count=PROFILE_POINTS,linear=True)
-    for i,value in enumerate((0.,.25,.5,.75,1.)):
-        y=rect.bottom()-value*rect.height();page.p.setPen(QPen(QColor('#e2e8ee'),.5))
-        page.p.drawLine(QPointF(rect.left(),y),QPointF(rect.right(),y))
-        page.text('curve-y-'+str(i),QRectF(0,y-7,47,15),f'{value:g}',10.5,align=Qt.AlignmentFlag.AlignRight)
-    for i,f in enumerate((0.,.25,.5,.75,1.)):
-        x=rect.left()+f*rect.width();page.p.setPen(QPen(QColor('#e2e8ee'),.5))
-        page.p.drawLine(QPointF(x,rect.top()),QPointF(x,rect.bottom()))
-        page.text('curve-x-'+str(i),QRectF(x-34,320,68,15),f'{(2*f-1)*s.half_span_m*1000:.3f}',10.5,align=Qt.AlignmentFlag.AlignHCenter)
-    page.text('curve-x-unit',QRectF(rect.left(),344,rect.width(),18),'横向位置 x / mm',10.5,align=Qt.AlignmentFlag.AlignHCenter)
-    d=s.profile.data;xs=rect.left()+(d.x+s.half_span_m)/(2*s.half_span_m)*rect.width();ys=rect.bottom()-d.intensity*rect.height()
-    poly=QPolygonF([QPointF(float(x),float(y)) for x,y in zip(xs,ys)])
-    page.p.save();page.p.setClipRect(rect.adjusted(-1,-1,1,1));page.p.setPen(QPen(QColor('#1266a6'),1.1));page.p.drawPolyline(poly);page.p.restore()
-    page.text('curve-legend',QRectF(0,376,page.w,32),
-        '蓝线：I(x,0)/I(0)，线性连续点光强。\n截面与二维图使用同一参数和观察范围；中心点为1。')
-    diagrams(page,s)
-    if third:
-        page.text('science-next-page',QRectF(0,603,page.w,35),'科学公式与适用限制见第3页。')
+def page_two(page, s, total):
+    p = s.params
+    page.header("过圆心截面与实验说明", f"{EXPERIMENT_TITLE} · {s.request.software}")
+    page.text("curve-title", QRectF(0, 103, page.w, 20),
+              "一维相对光强 I(x,0)/I(0)（无量纲，线性）", 11.5, True)
+    profile = s.profile.data
+    draw_profile(page, QRectF(36, 127, page.w-60, 154), profile.x, profile.intensity,
+                 s.half_span_m, decimals=3)
+    page.text("curve-legend", QRectF(0, 322, page.w, 22),
+              "截面取 y = 0，中心点为 1，与二维图共用同一参数及横向范围。", color=MUTED)
+
+    page.heading("geometry", 346, "孔径与光学装置")
+    apparatus(page, 371, p.diameter*1e6, p.distance)
+    page.text("geometry-note", QRectF(0, 465, page.w, 18), "示意图不按比例，尺寸以报告输入为准。",
+              9.5, color=MUTED)
+
+    page.heading("science", 486, "科学公式与物理解释")
+    page.formula(510, "I(ρ)/I(0) = [2 J1(u)/u]²",
+                 "u = π D ρ/(λ z)，ρ = √(x² + y²)，u = 0 时取极限 1。"
+                 "第一暗环由第一类一阶贝塞尔函数 J1 的首个正零点决定。", height=62)
+
+    page.heading("method", 577, "数值计算与采样")
+    sampling = s.request.eligibility.sampling
+    page.text("sampling", QRectF(0, 602, page.w, 46),
+              f"固定 {PDF_GRID} × {PDF_GRID} 独立网格，所需 {sampling.required_count} × {sampling.required_count}，"
+              f"当前每最短周期 {sampling.pixels_per_period:.2f} 像素。"
+              "像素强度为 2 × 2 Gauss-Legendre 面积均值。"
+              f"截面保留 {PROFILE_POINTS:,} 个含端点的线性点值。"
+              "二维图和截面分别检查 12 像素/最短周期门槛。缩放只改变显示大小。")
+    if total == 3:
+        page.text("limits-next-page", QRectF(0, 672, page.w, 24), "适用范围与限制见第 3 页。")
     else:
-        page.text('science-heading',QRectF(0,575,page.w,19),'科学公式与适用限制',12.5,True)
-        page.text('science-notes',QRectF(0,603,page.w,129),SCIENCE_TEXT)
+        page.heading("conditions", 652, "适用范围与限制")
+        page.p.fillRect(QRectF(0, 675, page.w, page.h-704), SOFT)
+        page.text("limits", QRectF(9, 679, page.w-18, page.h-712), LIMITS)
     page.footer(total)
 
-def _paint_document(device,snapshot):
-    writer=QPdfWriter(device);writer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
-    writer.setPageOrientation(QPageLayout.Orientation.Portrait)
-    writer.setPageMargins(QMarginsF(15,15,15,15),QPageLayout.Unit.Millimeter)
-    # One logical unit is one typographic point. Embedded image retains its
-    # original383 pixels; vector text/curve remains resolution-independent.
-    writer.setResolution(72);writer.setTitle('《光纹》圆孔夫琅禾费衍射报告');writer.setCreator(snapshot.request.software)
-    painter=QPainter()
-    if not painter.begin(writer):raise OSError('无法开始PDF绘制')
-    ledger=[];W,H=float(writer.width()),float(writer.height())
+
+def _paint_document(device, snapshot):
+    writer = QPdfWriter(device)
+    configure_writer(writer, f"《光纹》{EXPERIMENT_TITLE}报告", snapshot.request.software)
+    painter = QPainter()
+    if not painter.begin(writer):
+        raise OSError("无法开始PDF绘制")
+    ledger = []
+    w, h = float(writer.width()), float(writer.height())
     try:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setRenderHint(QPainter.RenderHint.LosslessImageRendering,True)
-        page=Page(painter,W,H,1,ledger);third=page.measure(SCIENCE_TEXT,W).height()>129
-        total=3 if third else 2
-        page_one(page,snapshot,total)
-        if not writer.newPage():raise OSError('无法创建PDF第2页')
-        page_two(Page(painter,W,H,2,ledger),snapshot,total,third)
-        if third:
-            if not writer.newPage():raise OSError('无法创建PDF第3页')
-            page=Page(painter,W,H,3,ledger)
-            page.text('page3-title',QRectF(0,0,W,28),'科学公式与适用限制',17,True)
-            page.text('page3-science',QRectF(0,53,W,H-100),SCIENCE_TEXT)
+        painter.setRenderHint(QPainter.RenderHint.LosslessImageRendering)
+        first = Page(painter, w, h, 1, ledger, PageLayoutError)
+        total = 3 if first.measure(LIMITS, w-18) > h-712 else 2
+        page_one(first, snapshot, total)
+        if not writer.newPage():
+            raise OSError("无法创建PDF第2页")
+        page_two(Page(painter, w, h, 2, ledger, PageLayoutError), snapshot, total)
+        if total == 3:
+            if not writer.newPage():
+                raise OSError("无法创建PDF第3页")
+            page = Page(painter, w, h, 3, ledger, PageLayoutError)
+            page.header("适用范围与限制", f"{EXPERIMENT_TITLE} · {snapshot.request.software}")
+            page.text("limits", QRectF(0, 119, w, h-165), LIMITS)
             page.footer(total)
-    finally:ended=painter.end()
-    if not ended:raise OSError('PDF绘制未正常结束')
-    return dict(pages=total,paper='A4 portrait',margins_mm=15,paintable_pt=[W,H],
-        body_font_pt=10.5,annotation_min_font_pt=9.5,text_overlap=False,text_clipping=False,ledger=ledger)
+    finally:
+        ended = painter.end()
+    if not ended:
+        raise OSError("PDF绘制未正常结束")
+    return dict(pages=total, paper="A4 portrait", margins_mm=15, paintable_pt=[w, h],
+                body_font_pt=10.5, annotation_min_font_pt=9.5, text_overlap=False,
+                text_clipping=False, ledger=ledger)
 
 def render_bytes(snapshot):
     validate_snapshot(snapshot)

@@ -2,12 +2,12 @@
 from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 import hashlib
+import os
 from uuid import uuid4
 import unittest
 from unittest.mock import patch
 
 import numpy as np
-from PySide6.QtCore import QRectF
 from PySide6.QtGui import QFont, QPainter, QPdfWriter
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtTest import QTest
@@ -19,18 +19,28 @@ from lightfringe.model import Mode, ModelError
 from lightfringe import report
 
 EVIDENCE = Path(__file__).resolve().parents[1] / 'artifacts/LF-P0-A2-R1'
+PDF_TEST_OUTPUT = Path(os.environ.get('LIGHTFRINGE_PDF_TEST_OUTPUT', EVIDENCE / 'test-output'))
 
 
 def parsed(path):
     doc = QPdfDocument()
     if doc.load(str(path)) != QPdfDocument.Error.None_:
         raise AssertionError(f'PDFium cannot open {path}')
-    assert doc.pageCount() == 1
-    size = doc.pagePointSize(0)
-    assert abs(size.width() - 842) < 2 and abs(size.height() - 595) < 2
-    text = ''.join(doc.getAllText(0).text().split())
-    doc.close()
-    return text
+    try:
+        assert doc.pageCount() == 2
+        pages = []
+        for page in range(doc.pageCount()):
+            size = doc.pagePointSize(page)
+            assert abs(size.width() - 595) < 2 and abs(size.height() - 842) < 2
+            text = ''.join(doc.getAllText(page).text().split())
+            assert f'第{page+1}页/共2页' in text
+            assert 'DESIGNPREVIEW' not in text
+            pages.append(text)
+        assert '一维灰度光纹带' in pages[0]
+        assert '科学公式与物理解释' in pages[1] and '数值计算与采样' in pages[1]
+        return ''.join(pages)
+    finally:
+        doc.close()
 
 
 class ReportTests(unittest.TestCase):
@@ -41,9 +51,10 @@ class ReportTests(unittest.TestCase):
 
     def setUp(self):
         # Stable F-drive scratch area, never Windows Temp.
-        self.folder = EVIDENCE / 'test-output' / ('report-' + uuid4().hex)
+        self.folder = PDF_TEST_OUTPUT / ('report-' + uuid4().hex)
         self.folder.mkdir(parents=True)
         self.w = MainWindow()
+        self.w.mode.setCurrentIndex(1)
         self.w.show()
         QTest.qWait(30)
 
@@ -61,7 +72,7 @@ class ReportTests(unittest.TestCase):
         path = report.write_pdf(s, self.folder/'中文单缝报告.pdf')
         text = parsed(path)
         for expected in ('《光纹》光学模拟报告', '单缝衍射', '632nm', '25μm', '1.25m',
-                         '±40mm', '31.6000mm', '63.2000mm', '相对光强I/I₀',
+                         '±40mm', '31.6000mm', '63.2000mm', '相对光强I/I(0)', 'sinc²(u)',
                          'x/mm', '无量纲', 'LF-P0-A2-R1', '模型有效性检查',
                          report.SIMULATION_NOTICE, report.NORMALIZATION):
             self.assertIn(''.join(expected.split()), text)
@@ -107,13 +118,16 @@ class ReportTests(unittest.TestCase):
         # The numerical model must never be invoked during PDF generation.
         with patch('lightfringe.model.intensity', side_effect=AssertionError('recalculation')), \
              patch('lightfringe.sampling.prepare_display', side_effect=AssertionError('resampling')), \
+             patch.object(report, 'draw_profile', wraps=report.draw_profile) as profile, \
              patch.object(QPainter, 'drawPolyline', curve), patch.object(QPainter, 'drawImage', screen):
             report.write_pdf(s, self.folder/'data.pdf')
         self.assertEqual(len(curves), 2)
-        expected_x = 286 + (s.data.x + s.data.span) / (2*s.data.span) * 476
+        profile.assert_called_once()
+        plot = profile.call_args.args[1]
+        expected_x = plot.left() + (s.data.x + s.data.span) / (2*s.data.span) * plot.width()
         for actual, values in zip(curves, (s.data.envelope, s.data.intensity)):
             np.testing.assert_allclose(actual[:, 0], expected_x, atol=1e-12)
-            np.testing.assert_allclose(actual[:, 1], 381 - values * 155, atol=1e-12)
+            np.testing.assert_allclose(actual[:, 1], plot.bottom() - values*plot.height(), atol=1e-12)
         np.testing.assert_array_equal(images[0], np.rint(255*np.sqrt(s.data.pixel_mean)).astype(np.uint8))
 
     def test_out_of_view_zeros_are_not_invented(self):
@@ -156,6 +170,18 @@ class ReportTests(unittest.TestCase):
                 report.write_pdf(self.w.report_snapshot(), path)
         self.assertEqual(path.read_bytes(), b'keep original')
         self.assertEqual(len(list(self.folder.iterdir())), 1)
+
+    def test_second_page_failure_does_not_publish_first_page(self):
+        path = self.folder/'已有.pdf'
+        path.write_bytes(b'keep original')
+        s = self.w.report_snapshot()
+        with patch.object(QPdfWriter, 'newPage', return_value=False):
+            with self.assertRaises(OSError):
+                report.write_pdf(s, path)
+            with self.assertRaises(OSError):
+                report.write_pdf(s, self.folder/'新报告.pdf')
+        self.assertEqual(path.read_bytes(), b'keep original')
+        self.assertEqual(list(self.folder.iterdir()), [path])
 
     def test_write_failure_and_extension(self):
         for path in (self.folder/'missing'/'file.pdf', self.folder/'folder.pdf'):

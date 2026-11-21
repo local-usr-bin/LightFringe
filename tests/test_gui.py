@@ -2,9 +2,10 @@ import unittest
 import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QTextBrowser
+from lightfringe import __version__
 from lightfringe.gui import MainWindow
-from lightfringe.model import Parameters
+from lightfringe.model import Mode, Parameters
 
 
 class GuiTests(unittest.TestCase):
@@ -23,13 +24,44 @@ class GuiTests(unittest.TestCase):
 
     def test_defaults_and_mode_switch(self):
         w = self.window
-        self.assertEqual(w.parameters(), Parameters())
-        self.assertIsNotNone(w.view.data)
-        double = w.view.data.intensity.copy()
-        w.mode.setCurrentIndex(0)
-        self.app.processEvents()
+        self.assertEqual(w.mode.currentText(), '单缝衍射')
+        self.assertEqual(w.parameters(), Parameters(mode=Mode.SINGLE))
+        self.assertEqual(w.view.params, w.parameters())
+        self.assertEqual(w.apparatus.slit_count, 1)
         self.assertFalse(w.separation.isEnabled())
-        self.assertTrue(np.all(w.view.data.intensity >= double-1e-15))
+        self.assertIn('单缝模式', w.geometry_note.text())
+        self.assertIn('远场准则通过', w.status.text())
+        self.assertIsNotNone(w.view.data)
+        self.assertIsNotNone(w.view._image)
+        single = w.view.data.intensity.copy()
+        w.mode.setCurrentIndex(1)
+        self.app.processEvents()
+        self.assertEqual(w.parameters(), Parameters())
+        self.assertTrue(w.separation.isEnabled())
+        self.assertTrue(np.all(single >= w.view.data.intensity - 1e-15))
+
+    def test_about_dialog_uses_current_version_and_closes_at_small_size(self):
+        QTest.mouseClick(self.window.about_button, Qt.MouseButton.LeftButton)
+        self.app.processEvents()
+        dialog = self.app.activeModalWidget()
+        self.assertIsInstance(dialog, QDialog)
+        try:
+            self.assertEqual(dialog.windowTitle(), '关于光纹')
+            body = dialog.findChild(QTextBrowser).toPlainText()
+            for phrase in (__version__, '单缝衍射', '艾里斑', '安全关键决策', 'MIT', 'THIRD-PARTY-NOTICES.md'):
+                self.assertIn(phrase, body)
+            dialog.resize(360, 260)
+            self.app.processEvents()
+            buttons = dialog.findChild(QDialogButtonBox)
+            close = buttons.button(QDialogButtonBox.StandardButton.Close)
+            self.assertTrue(dialog.rect().contains(buttons.geometry()))
+            self.assertTrue(close.isVisible())
+            QTest.mouseClick(close, Qt.MouseButton.LeftButton)
+            self.app.processEvents()
+            self.assertIsNone(self.app.activeModalWidget())
+        finally:
+            if self.app.activeModalWidget() is dialog:
+                dialog.reject()
 
     def test_slider_keyboard_updates_both_views(self):
         w = self.window
@@ -46,6 +78,7 @@ class GuiTests(unittest.TestCase):
 
     def test_geometry_constraints_and_single_to_double(self):
         w = self.window
+        w.mode.setCurrentIndex(1)
         w.separation.spin.setValue(40)
         w.width_control.spin.setValue(80)
         self.assertEqual(w.width_control.value(), 35)
@@ -58,6 +91,7 @@ class GuiTests(unittest.TestCase):
 
     def test_far_field_failure_clears_previous_prediction_and_reset(self):
         w = self.window
+        w.mode.setCurrentIndex(1)
         w.separation.spin.setValue(250)
         w.width_control.spin.setValue(80)
         w.wavelength.spin.setValue(380)
@@ -71,6 +105,7 @@ class GuiTests(unittest.TestCase):
 
     def test_sampling_failure_and_resize_recovery(self):
         # A small physical view must not show stale/aliased predictions.
+        self.window.mode.setCurrentIndex(1)
         view = self.window.view
         view.setParent(None)
         view.setMinimumSize(1, 1)

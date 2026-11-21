@@ -5,8 +5,9 @@ import numpy as np
 from PySide6.QtCore import Qt, QRectF, QPointF, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (
-    QComboBox, QDoubleSpinBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
-    QPushButton, QScrollArea, QSlider, QSpinBox, QVBoxLayout, QWidget, QFileDialog, QMessageBox,
+    QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFrame,
+    QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QScrollArea,
+    QSlider, QSpinBox, QTextBrowser, QVBoxLayout, QWidget,
 )
 
 from .model import Mode, ModelError, Parameters
@@ -358,7 +359,12 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(root)
         title = QLabel("光纹  LightFringe")
         title.setStyleSheet("font-size:24px;font-weight:600;padding:5px;")
-        layout.addWidget(title)
+        header = QHBoxLayout()
+        header.addWidget(title, 1)
+        self.about_button = QPushButton("关于光纹")
+        self.about_button.clicked.connect(self.show_about)
+        header.addWidget(self.about_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+        layout.addLayout(header)
         subtitle = QLabel(f"波动光学实验 · {__version__}    |    夫琅禾费远场 · 相干、单色、等幅照明")
         layout.addWidget(subtitle)
         body = QHBoxLayout()
@@ -369,7 +375,7 @@ class MainWindow(QMainWindow):
         self.mode = QComboBox()
         self.mode.setAccessibleName("实验模式")
         self.mode.addItems(["单缝衍射", "双缝干涉 + 衍射", "多缝干涉 + 衍射"])
-        self.mode.setCurrentIndex(1)
+        self.mode.setCurrentIndex(0)
         controls.addWidget(QLabel("实验模式"))
         controls.addWidget(self.mode)
         self.slit_count_row = QWidget()
@@ -440,6 +446,34 @@ class MainWindow(QMainWindow):
         self._changed()
         available = self.screen().availableGeometry()
         self.resize(min(1220, available.width() - 24), min(820, available.height() - 48))
+
+    def show_about(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("关于光纹")
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        layout = QVBoxLayout(dialog)
+        content = QTextBrowser(dialog)
+        content.setHtml(
+            f"<h2>光纹 LightFringe {__version__}</h2>"
+            f"<p>构建 {__build__}</p>"
+            "<p>用于波动光学教学、演示和定性比较。可观察单缝衍射、"
+            "双缝和多缝干涉条纹，以及圆孔的艾里斑和光强截面。</p>"
+            "<p><b>使用方法</b><br>选择实验模式并调整参数。键入数值后按回车确认。"
+            "观察图样和光强曲线，计算有效时可导出 PDF 报告。</p>"
+            "<p><b>模型与适用范围</b><br>模型假定单色、相干的理想入射光和理想孔径，"
+            "采用标量、傍轴、夫琅禾费远场近似。光强按当前配置的中心光强归一化，"
+            "图样和曲线均为数值模拟，不能作为实测功率或照度。"
+            "请勿将模拟结果用于真实设备控制、激光安全或其他安全关键决策。</p>"
+            "<p><b>许可</b><br>自有代码和两份获授权的参考 JSON 采用 MIT 许可，见 LICENSE。"
+            "第三方组件见 THIRD-PARTY-NOTICES.md 和发行包中的 LICENSES/。</p>"
+        )
+        layout.addWidget(content)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, parent=dialog)
+        buttons.button(QDialogButtonBox.StandardButton.Close).setText("关闭")
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.resize(520, 420)
+        dialog.open()
 
     def parameters(self):
         if self.mode.currentIndex() == 2:

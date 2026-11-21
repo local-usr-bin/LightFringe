@@ -2,6 +2,7 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 from uuid import uuid4
 import hashlib
+import os
 import unittest
 from unittest.mock import patch
 import numpy as np
@@ -12,10 +13,12 @@ from PySide6.QtWidgets import QApplication
 
 from lightfringe.gui import MainWindow
 from lightfringe.multislit import MultiParameters
+from lightfringe import report
 from lightfringe.report import ReportError, write_pdf
 from test_report import parsed
 
 E=Path(__file__).resolve().parents[1]/'artifacts/LF-P0-A3-MULTISLIT-R1'
+PDF_TEST_OUTPUT = Path(os.environ.get('LIGHTFRINGE_PDF_TEST_OUTPUT', E/'test-output'))
 
 
 class MultislitGuiPdfTests(unittest.TestCase):
@@ -26,7 +29,7 @@ class MultislitGuiPdfTests(unittest.TestCase):
 
     def setUp(self):
         self.w=MainWindow();self.w.show();QTest.qWait(40)
-        self.folder=E/'test-output'/('multi-'+uuid4().hex);self.folder.mkdir(parents=True)
+        self.folder=PDF_TEST_OUTPUT/('multi-'+uuid4().hex);self.folder.mkdir(parents=True)
         self.warn_patch=patch('lightfringe.gui.QMessageBox.warning')
         self.warnings=self.warn_patch.start()
 
@@ -55,6 +58,7 @@ class MultislitGuiPdfTests(unittest.TestCase):
             previous=s.data.intensity.copy()
 
     def test_legacy_and_multi_settings_survive_switching(self):
+        self.w.mode.setCurrentIndex(1)
         self.w._load_values((620,25,110,1.7));self.w._changed()
         old=self.w.parameters()
         self.set_multi(5,(633,20,80,1.5));multi=self.w.parameters()
@@ -116,7 +120,7 @@ class MultislitGuiPdfTests(unittest.TestCase):
             self.set_multi(n,values)
             text=parsed(write_pdf(self.w.report_snapshot(),self.folder/f'多缝N{n}.pdf'))
             for token in ('多缝干涉',f'N={n}',f'{values[0]}nm',f'{values[1]}μm',f'{values[2]}μm',
-                          f'{values[3]:.2f}m',f'W={W}μm','相对光强I/Imax','同相等幅',
+                          f'{values[3]:.2f}m',f'W={W}μm','相对光强I/I(0)','同相等幅',
                           '非实测','矢量','缩小查看','有效显示密度'):
                 # The mandatory statement uses “并非实测数据”.
                 self.assertIn(token,text)
@@ -136,12 +140,15 @@ class MultislitGuiPdfTests(unittest.TestCase):
         def image(p,rect,img):
             images.append([img.pixelColor(i,0).red() for i in range(img.width())]);return original_image(p,rect,img)
         with patch('lightfringe.multislit.intensity',side_effect=AssertionError('PDF recomputation')), \
+             patch.object(report, 'draw_profile', wraps=report.draw_profile) as profile, \
              patch.object(QPainter,'drawPolyline',curve),patch.object(QPainter,'drawImage',image):
             write_pdf(s,self.folder/'source.pdf')
         self.assertEqual(len(curves),2)
+        profile.assert_called_once()
+        plot = profile.call_args.args[1]
         for actual,y in zip(curves,(s.data.envelope,s.data.intensity)):
-            np.testing.assert_allclose(actual[:,0],286+(s.data.x+s.data.span)/(2*s.data.span)*476,atol=1e-12)
-            np.testing.assert_allclose(actual[:,1],381-y*155,atol=1e-12)
+            np.testing.assert_allclose(actual[:,0],plot.left()+(s.data.x+s.data.span)/(2*s.data.span)*plot.width(),atol=1e-12)
+            np.testing.assert_allclose(actual[:,1],plot.bottom()-y*plot.height(),atol=1e-12)
         np.testing.assert_array_equal(images[0],np.rint(255*np.sqrt(s.data.pixel_mean)).astype(np.uint8))
         with self.assertRaises(FrozenInstanceError):s.params.slit_count=3
         with self.assertRaises(ValueError):s.data.intensity.setflags(write=True)

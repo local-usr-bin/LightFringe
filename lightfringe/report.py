@@ -1,4 +1,4 @@
-"""Immutable capture of completed GUI results and atomic, single-page PDF export.
+"""Immutable capture of completed GUI results and atomic PDF export.
 
 No intensity evaluation or resampling is performed in this module. The curve,
 envelope, pixel means and span are copied from the completed DisplayData object.
@@ -11,21 +11,22 @@ import hashlib
 import math
 
 import numpy as np
-from PySide6.QtCore import QIODevice, QMarginsF, QPointF, QRectF, QSaveFile, Qt
-from PySide6.QtGui import (
-    QColor, QFont, QFontMetricsF, QImage, QPageLayout, QPageSize,
-    QPainter, QPdfWriter, QPen, QPolygonF,
-)
+from PySide6.QtCore import QIODevice, QRectF, QSaveFile, Qt
+from PySide6.QtGui import QImage, QPainter, QPdfWriter
 
-from . import __version__, __build__, __baseline__
+from . import __baseline__
 from .annotations import missing_order_note, missing_order_relation
 from .model import Mode, ModelError, Parameters
-from .multislit import MultiParameters, is_multi, characteristic_lengths, validate
-from .sampling import DisplayData, MIN_PIXELS_PER_PERIOD
+from .multislit import MultiMode, MultiParameters, is_multi, characteristic_lengths, validate
+from .report_layout import (
+    MUTED, NORMALIZATION, REPORT_TITLE, SIMULATION_NOTICE, SOFT, SOFTWARE,
+    Page, apparatus, configure_writer, draw_profile,
+)
+from .sampling import DisplayData, MIN_PIXELS_PER_PERIOD, SUBPIXELS
 
 
 class ReportError(ValueError):
-    """No completed trustworthy result, or no readable single-page layout."""
+    """No completed trustworthy result, or no readable PDF layout."""
 
 
 def local_now():
@@ -79,8 +80,7 @@ def capture_snapshot(params: Parameters, data: DisplayData, revision: int,
     for a in arrays:
         digest.update(np.asarray(a, dtype=np.float64).tobytes())
     zero, fringe = characteristic_lengths(params)
-    software = (f"光纹 LightFringe {__version__} ({__build__})" if is_multi(params) else
-                f"光纹 LightFringe {__version__} · {__build__}（核心基线 {__baseline__}）")
+    software = SOFTWARE if is_multi(params) else f"{SOFTWARE} · 核心基线 {__baseline__}"
     return ReportSnapshot(params, frozen, revision, local_now(), software,
                           width_um, separation_um, zero, fringe, digest.hexdigest())
 
@@ -122,125 +122,159 @@ def result_lines(s: ReportSnapshot) -> tuple[str, ...]:
     return tuple(lines)
 
 
-NORMALIZATION = "光强使用相对归一化表示，不同参数下的峰值高度不可直接用于比较实际透射光功率。"
-SIMULATION_NOTICE = "本报告为数值模拟结果，并非实测数据。"
+_SCIENCE = {
+    Mode.SINGLE: (
+        "I(x)/I(0) = sinc²(u)",
+        "u = π a x/(λ z)，sinc(u) = sin(u)/u。u = 0 时取 1。",
+        "缝宽 a 决定衍射包络。两侧首暗纹位于 x = ±λz/a，中央亮纹宽度为两首暗纹的距离。",
+    ),
+    Mode.DOUBLE: (
+        "I(x)/I(0) = sinc²(u) cos²(v)",
+        "u = π a x/(λ z)，v = π d x/(λ z)。sinc(u) = sin(u)/u，sinc(0) = 1。",
+        "有限缝宽形成单缝包络。干涉因子的周期是 λz/d，实际侧峰间距会受包络影响。"
+        "包络零点与理论主极大重合时形成缺级。",
+    ),
+    MultiMode.MULTI: (
+        "I(x)/I(0) = sinc²(u) [sin(Nv)/(N sin(v))]²",
+        "u = π a x/(λ z)，v = π d x/(λ z)。sinc(u) = sin(u)/u，sinc(0) = 1。"
+        "sin(v) = 0 时，平方比值取连续极限 1。",
+        "等宽等距、同相等幅的 N 缝叠加。干涉因子的周期是 λz/d，中央主峰两侧最近零点的间距为 2λz/(Nd)。"
+        "包络零点与理论主极大重合时形成缺级。",
+    ),
+}
 
 
-def _font(size, bold=False):
-    font = QFont("Microsoft YaHei UI")
-    font.setPixelSize(size)
-    font.setBold(bold)
-    return font
+def _experiment_title(params):
+    if is_multi(params):
+        return "多缝干涉与衍射"
+    if params.mode == Mode.SINGLE:
+        return "单缝衍射"
+    return "双缝干涉与衍射"
 
 
-def _text(painter, rect, text, size=10, bold=False, align=Qt.AlignmentFlag.AlignLeft):
-    painter.setFont(_font(size, bold))
-    painter.setPen(QColor("#203448"))
-    flags = int(align | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap)
-    bounds = QFontMetricsF(painter.font(), painter.device()).boundingRect(rect, flags, text)
-    if bounds.height() > rect.height() + .5 or bounds.width() > rect.width() + .5:
-        raise ReportError("A4 横向单页无法清晰容纳当前内容，已停止导出；未缩小字体")
-    painter.drawText(rect, flags, text)
+def _paint_page(painter, s, generated_at, width, height, ledger):
+    page = Page(painter, width, height, 1, ledger, ReportError)
+    params = s.params
+    multi = is_multi(params)
+    page.header(_experiment_title(params), s.software, generated_at)
+    fields = input_lines(s)
+    inputs = [line.split("：", 1) for line in fields[:-1]]
+    if multi:
+        inputs.insert(-1, ("缝数 N", f"N = {params.slit_count}"))
+    page.heading("inputs", 123, "输入参数")
+    page.cards("inputs", 146, 49, inputs)
 
+    results = result_lines(s)
+    if params.mode == Mode.SINGLE:
+        cards = [*results, fields[-1]]
+        comments = []
+    elif multi:
+        cards = list(results[:3])
+        comments = list(results[3:])
+        if "当前范围不可确定" in cards[2]:
+            comments.insert(0, "首暗纹位置：当前范围不可确定。")
+            cards[2] = "包络首暗纹：位于视场外"
+    else:
+        cards = [results[0], results[2]]
+        comments = [results[3]]
+        missing = results[-1]
+        if missing.startswith("首组缺级："):
+            order, position = missing.split("，", 1)
+            cards.append(order)
+            comments.insert(1, f"首组缺级位置：{position}。")
+        else:
+            cards.append("首组缺级：位于视场外")
+            comments.append(missing)
+    page.heading("results", 203, "关键结果")
+    page.cards("results", 226, 62, [line.split("：", 1) for line in cards], results=True)
+    aperture = (f"完整孔径 W = {params.aperture_extent * 1e6:g} μm。"
+                f"F = {params.fresnel_number:.6f} ≤ 0.05。")
+    notes = aperture
+    if comments:
+        observations = "  ".join(comments).replace("；", "。")
+        notes = f"{observations}\n{fields[-1]}。{aperture}"
+    page.text("result-notes", QRectF(0, 293, width, 53), notes, 10.5, color=MUTED)
 
-def _paint_page(painter: QPainter, s: ReportSnapshot, generated_at: datetime):
-    # A4 landscape with 12 mm margins, approximately 774 x 527 pt.
-    _text(painter, QRectF(0, 0, 774, 31), "《光纹》光学模拟报告", 22, True)
-    mode = "单缝衍射" if s.params.mode == Mode.SINGLE else "双缝干涉 + 衍射（有限缝宽）"
-    if is_multi(s.params):
-        mode = f"多缝干涉（N = {s.params.slit_count}，等宽等距、同相等幅）"
-    _text(painter, QRectF(0, 39, 470, 17), f"实验类型：{mode}", 11)
-    _text(painter, QRectF(470, 39, 304, 17), f"PDF 生成时间：{generated_at:%Y-%m-%d %H:%M:%S} +08:00", 10)
-    _text(painter, QRectF(0, 60, 774, 18), f"{s.software}    |    计算模型：标量傍轴夫琅禾费远场", 10)
-    painter.setPen(QPen(QColor("#cfdae4"), .8))
-    painter.drawLine(QPointF(0, 84), QPointF(774, 84))
-    _text(painter, QRectF(0, 96, 230, 20), "输入参数与当前范围", 12, True)
-    for i, line in enumerate(input_lines(s)):
-        _text(painter, QRectF(0, 124 + i * 21, 230, 20), line, 11)
-    _text(painter, QRectF(0, 242, 230, 20), "关键结果（理想远场模型）", 12, True)
-    _text(painter, QRectF(0, 270, 233, 126), "\n".join(result_lines(s)), 10)
-    symbol = 'W' if is_multi(s.params) else 'D'
-    _text(painter, QRectF(0, 405, 234, 35),
-          f"完整孔径 {symbol} = {s.params.aperture_extent * 1e6:g} μm\n"
-          f"F = {s.params.fresnel_number:.6f} ≤ 0.05", 10)
-
-    left, width = 286.0, 476.0
-    _text(painter, QRectF(left, 96, width, 18), "观察屏光纹示意（与曲线共用 x 坐标）", 11, True)
+    page.heading("figures", 349, "观察屏光纹与相对光强")
+    page.text("screen-label", QRectF(36, 375, width-60, 18), "一维灰度光纹带", 10.5, True)
+    plot = QRectF(36, 469, width-60, 156)
+    strip = QRectF(plot.left(), 395, plot.width(), 39)
     level = np.rint(255 * np.sqrt(s.data.pixel_mean)).astype(np.uint8)
     rgb = np.repeat(level[:, None], 3, axis=1).copy()
     image = QImage(rgb.data, len(level), 1, len(level)*3, QImage.Format.Format_RGB888).copy()
+    page.graphic("slit-screen", strip, source_pixels=len(level))
     painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
-    painter.drawImage(QRectF(left, 120, width, 40), image)
-    _text(painter, QRectF(left, 167, width, 28),
-          "灰度亮度 = √(像素平均 I/I₀)，仅辅助显示，非测量 RGB。\n"
-          "屏幕高度仅重复一维截面；非二维有限孔径模拟。", 9)
-    _text(painter, QRectF(left, 202, width, 17), "相对光强 I/Imax（Imax=I(0)，无量纲，线性）" if is_multi(s.params)
-          else "相对光强 I/I₀（无量纲，线性）", 10)
-    plot = QRectF(left, 226, width, 155)
-    for value in (0, .25, .5, .75, 1):
-        y = plot.bottom() - value * plot.height()
-        painter.setPen(QPen(QColor("#e2e8ee"), .6))
-        painter.drawLine(QPointF(left, y), QPointF(plot.right(), y))
-        _text(painter, QRectF(247, y - 6, 32, 15), f"{value:g}", 9, align=Qt.AlignmentFlag.AlignRight)
-    for i in range(9):
-        px = left + width * i / 8
-        painter.setPen(QPen(QColor("#e2e8ee"), .6))
-        painter.drawLine(QPointF(px, plot.top()), QPointF(px, plot.bottom()))
-        _text(painter, QRectF(px-22, plot.bottom()+6, 44, 16),
-              f"{(-s.data.span + 2*s.data.span*i/8)*1000:g}", 9, align=Qt.AlignmentFlag.AlignHCenter)
-    _text(painter, QRectF(left, 409, width, 17), "观察屏横向位置 x / mm", 10, align=Qt.AlignmentFlag.AlignHCenter)
-    px = left + (s.data.x + s.data.span) / (2*s.data.span) * width
-    painter.save()
-    painter.setClipRect(plot.adjusted(-1, -1, 1, 1))
-    for values, color, style in (
-        (s.data.envelope, "#b17c35", Qt.PenStyle.DashLine),
-        (s.data.intensity, "#1266a6", Qt.PenStyle.SolidLine),
-    ):
-        if values is s.data.envelope and s.params.mode == Mode.SINGLE:
-            continue
-        py = plot.bottom() - values * plot.height()
-        polygon = QPolygonF([QPointF(float(x), float(y)) for x, y in zip(px, py)])
-        painter.setPen(QPen(QColor(color), 1.0, style))
-        painter.drawPolyline(polygon)
-    painter.restore()
-    legend = "蓝线：有限缝宽双缝光强；虚线：单缝包络" if s.params.mode == Mode.DOUBLE else "蓝线：单缝衍射光强"
-    if is_multi(s.params):
-        legend = f"蓝线：N={s.params.slit_count} 有限宽多缝光强；虚线：单缝包络"
-    _text(painter, QRectF(left, 430, width, 16), legend, 9)
-    painter.setPen(QPen(QColor("#cfdae4"), .8))
-    painter.drawLine(QPointF(0, 453), QPointF(774, 453))
-    _text(painter, QRectF(0, 462, 774, 18), SIMULATION_NOTICE, 11, True)
-    _text(painter, QRectF(0, 484, 774, 17), NORMALIZATION, 10)
-    footer = (f"理想长缝、标量、傍轴、远场模型；本次输入已通过模型有效性检查。"
-              f"显示采样：{s.data.pixels_per_period:.1f} 像素/最短周期（要求 ≥ {MIN_PIXELS_PER_PERIOD}）。")
-    if is_multi(s.params):
-        min_dpi = 12*2*s.data.span*s.params.aperture_extent/(s.params.wavelength*s.params.distance)/476*72
-        footer = (f"理想长缝、标量傍轴远场；有效性检查通过。最短周期采样 {s.data.pixels_per_period:.1f} 像素 ≥ 12。\n"
-                  f"曲线为矢量；缩小查看可能失去细峰，建议有效显示密度 ≥ {math.ceil(min_dpi)} dpi（放大可提高）；灰度图仅辅助观察。")
-    _text(painter, QRectF(0, 501, 774, 26) if is_multi(s.params) else QRectF(0, 505, 774, 19), footer, 9)
+    painter.drawImage(strip, image)
+
+    page.text("curve-title", QRectF(36, 441, 222, 20), "相对光强 I/I(0)（无量纲，线性）", 10.5, True)
+    envelope = None if params.mode == Mode.SINGLE else s.data.envelope
+    legend = "蓝线：相对光强" if envelope is None else "蓝线：相对光强    虚线：单缝包络"
+    page.text("curve-legend", QRectF(264, 441, width-288, 20), legend,
+              9.5, align=Qt.AlignmentFlag.AlignRight, color=MUTED)
+    draw_profile(page, plot, s.data.x, s.data.intensity, s.data.span, envelope=envelope)
+    page.text("gray-note", QRectF(0, 680, width, 34),
+              "光纹带和曲线共用横坐标。灰度 = √(像素平均 I/I(0))，仅辅助观察。"
+              "带状图高度重复一维截面，不表示二维有限孔径计算。", color=MUTED)
+    page.footer(2)
+    return plot.width()
+
+
+def _paint_methods(page, s, plot_width):
+    p = s.params
+    multi = is_multi(p)
+    width = page.w
+    page.header("孔径、原理与数值方法", f"{_experiment_title(p)} · {s.software}")
+    page.heading("geometry", 116, "孔径与光学装置")
+    slit_count = p.slit_count if multi else (1 if p.mode == Mode.SINGLE else 2)
+    apparatus(page, 141, s.width_um, p.distance, slit_count=slit_count, separation_um=s.separation_um)
+    page.text("geometry-note", QRectF(0, 239, width, 18), "示意图不按比例，尺寸以报告输入为准。",
+              9.5, color=MUTED)
+
+    equation, symbols, explanation = _SCIENCE[p.mode]
+    page.heading("science", 277, "科学公式与物理解释")
+    page.formula(303, equation, symbols)
+    page.text("physics", QRectF(0, 379, width, 57), explanation)
+
+    page.heading("method", 451, "数值计算与采样")
+    sampling = (f"使用同一已完成的 GUI 科学快照。灰度带有 {len(s.data.pixel_mean):,} 个物理像素，"
+                f"每像素取 {SUBPIXELS} 个中点强度的均值。最短周期采样为 {s.data.pixels_per_period:.1f} 像素"
+                f"（要求 ≥ {MIN_PIXELS_PER_PERIOD}）。矢量曲线保留 {len(s.data.x):,} 个含端点的线性点值。")
+    if multi:
+        min_dpi = math.ceil(MIN_PIXELS_PER_PERIOD * 2*s.data.span*p.aperture_extent
+                            / (p.wavelength * p.distance) / plot_width * 72)
+        sampling += (f"阵列因子在整数周期附近按连续极限求值。缩小查看可能漏掉细峰，"
+                     f"建议有效显示密度 ≥ {min_dpi} dpi，可放大查看。")
+    page.text("sampling", QRectF(0, 477, width, 91), sampling)
+    page.heading("conditions", 584, "适用范围与限制")
+    page.p.fillRect(QRectF(0, 611, width, 91), SOFT)
+    conditions = ("理想长直缝与单色、相干、等幅照明。采用标量、傍轴、夫琅禾费远场模型。"
+                  "输入已通过模型有效性检查。完整孔径 W 满足 F = (W/2)²/(λ z) ≤ 0.05，且 |x|/z ≤ 0.05。"
+                  f"{NORMALIZATION}数值模拟不提供绝对照度。")
+    page.text("limits", QRectF(11, 619, width-22, 74), conditions)
+    page.footer(2)
 
 
 def _write_document(device, snapshot, generated_at):
-    """Keep writer lifetime inside this scope: finalize it before commit."""
+    """Finalize both pages before allowing QSaveFile to replace the destination."""
     writer = QPdfWriter(device)
-    writer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
-    writer.setPageOrientation(QPageLayout.Orientation.Landscape)
-    writer.setPageMargins(QMarginsF(12, 12, 12, 12), QPageLayout.Unit.Millimeter)
-    writer.setResolution(144)
-    writer.setTitle("《光纹》光学模拟报告")
-    writer.setCreator(snapshot.software)
+    configure_writer(writer, REPORT_TITLE, snapshot.software)
     painter = QPainter()
     if not painter.begin(writer):
         raise OSError("无法开始 PDF 绘制")
     try:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.scale(writer.width() / 774, writer.height() / 527)
-        _paint_page(painter, snapshot, generated_at)
+        painter.setRenderHint(QPainter.RenderHint.LosslessImageRendering)
+        width, height = float(writer.width()), float(writer.height())
+        ledger = []
+        plot_width = _paint_page(painter, snapshot, generated_at, width, height, ledger)
+        if not writer.newPage():
+            raise OSError("无法创建 PDF 第 2 页")
+        _paint_methods(Page(painter, width, height, 2, ledger, ReportError), snapshot, plot_width)
     finally:
         ended = painter.end()
     if not ended:
         raise OSError("PDF 绘制未能正常结束")
-    # CPython releases painter and writer on function return, completing xref.
+    # The writer is released on return, before the caller commits QSaveFile.
 
 
 def write_pdf(snapshot: ReportSnapshot, destination) -> Path:

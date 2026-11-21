@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog
 from lightfringe.gui import MainWindow
 from lightfringe.model import ModelError
 from lightfringe.report import ReportError
-from test_report import EVIDENCE, parsed
+from test_report import PDF_TEST_OUTPUT, parsed
 
 
 class ExportGuiTests(unittest.TestCase):
@@ -19,9 +19,10 @@ class ExportGuiTests(unittest.TestCase):
 
     def setUp(self):
         self.w = MainWindow()
+        self.w.mode.setCurrentIndex(1)
         self.w.show()
         QTest.qWait(30)
-        self.folder = EVIDENCE / 'test-output' / ('gui-' + uuid4().hex)
+        self.folder = PDF_TEST_OUTPUT / ('gui-' + uuid4().hex)
         self.folder.mkdir(parents=True)
         self.warning_patch = patch('lightfringe.gui.QMessageBox.warning')
         self.unexpected_warning = self.warning_patch.start()
@@ -138,7 +139,7 @@ class ExportGuiTests(unittest.TestCase):
             self.w.export_report()
         text = parsed(path)
         self.assertIn('550nm', text)
-        self.assertIn('双缝中心距d：150μm', text)
+        self.assertIn('双缝中心距d150μm', text)
         self.assertNotIn('700nm', text)
         self.assertTrue(self.w.export_button.isEnabled())
 
