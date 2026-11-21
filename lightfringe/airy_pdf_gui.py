@@ -1,9 +1,9 @@
-"""Minimal PDF-only successor; frozen A4-2 views and their messages are intact."""
+"""Attach the independent single-disk PDF exporter to the experiment window."""
 from PySide6.QtWidgets import QFileDialog,QMessageBox
-from .circular_gui import AiryMainWindow
+from .multiaperture_gui import MultiApertureWindow
 from .circular_report import assess_pdf,capture_request,build_snapshot,write_pdf,CircularReportError
 
-class AiryPdfMainWindow(AiryMainWindow):
+class AiryPdfMainWindow(MultiApertureWindow):
     def __init__(self):
         self._pdf_ready=False
         super().__init__()

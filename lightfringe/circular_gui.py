@@ -68,17 +68,26 @@ class AiryResult:
     error: str = ''
 
 
+def _airy_data(request):
+    screen = prepare_screen(request.params, request.side)
+    profile = prepare_profile(request.params, request.profile_points)
+    if screen.data is None or profile.data is None:
+        raise RuntimeError('科学核心未返回当前请求的有效数据')
+    return screen, profile
+
+
 class _NumericalWorker(QObject):
     finished = Signal(object)
+
+    def __init__(self, prepare):
+        super().__init__()
+        self.prepare = prepare
 
     @Slot(object)
     def compute(self, request):
         start = time.perf_counter_ns()
         try:
-            screen = prepare_screen(request.params, request.side)
-            profile = prepare_profile(request.params, request.profile_points)
-            if screen.data is None or profile.data is None:
-                raise RuntimeError('科学核心未返回当前请求的有效数据')
+            screen, profile = self.prepare(request)
             payload = AiryResult(request, screen, profile, (time.perf_counter_ns()-start)/1e6)
         except Exception as exc:
             payload = AiryResult(request, compute_ms=(time.perf_counter_ns()-start)/1e6,
@@ -91,7 +100,7 @@ class AiryView(QWidget):
     presented = Signal(int, float)
     _compute = Signal(object)
 
-    def __init__(self):
+    def __init__(self, prepare=_airy_data):
         super().__init__()
         self.setMinimumSize(450, 350)
         self.setAccessibleName('艾里斑二维观察屏与过圆心线性相对光强截面')
@@ -119,7 +128,7 @@ class AiryView(QWidget):
         self._timer.setInterval(16)
         self._timer.timeout.connect(self._launch)
         self._thread = QThread(self)
-        self._worker = _NumericalWorker()
+        self._worker = _NumericalWorker(prepare)
         self._worker.moveToThread(self._thread)
         self._compute.connect(self._worker.compute, Qt.ConnectionType.QueuedConnection)
         self._worker.finished.connect(self._completed, Qt.ConnectionType.QueuedConnection)
@@ -227,21 +236,25 @@ class AiryView(QWidget):
             self.state, self.reason = 'COMPUTE_FAILED', '计算失败，预测暂停：' + payload.error
             self.update(); self.stateChanged.emit()
         else:
-            # QImage ownership, paths and every QWidget mutation stay on GUI thread.
-            level = np.rint(255*np.sqrt(payload.screen.data.pixel_mean)).astype(np.uint8)
-            rgb = np.repeat(level[::-1, :, None], 3, axis=2).copy()
-            image = QImage(rgb.data, request.side, request.side, request.side*3,
-                           QImage.Format.Format_RGB888).copy()
-            image.setDevicePixelRatio(request.key[3])
-            rect = self.geometry_data().curve
-            p = payload.profile.data
-            px = rect.left() + (p.x+p.half_span_m)/(2*p.half_span_m)*rect.width()
-            py = rect.bottom() - p.intensity*rect.height()
-            self._polygon = QPolygonF([QPointF(float(x), float(y)) for x,y in zip(px,py)])
-            self.result, self._image = payload, image
-            self.state, self.reason = 'DISPLAY_VALID', RING_TEXT[payload.screen.visibility]
+            self._display_result(payload)
             self.update(); self.stateChanged.emit()
         if self._pending is not None and not self._timer.isActive(): self._launch()
+
+    def _display_result(self, payload):
+        # QImage ownership, paths and every QWidget mutation stay on GUI thread.
+        request = payload.request
+        level = np.rint(255*np.sqrt(payload.screen.data.pixel_mean)).astype(np.uint8)
+        rgb = np.repeat(level[::-1, :, None], 3, axis=2).copy()
+        image = QImage(rgb.data, request.side, request.side, request.side*3,
+                       QImage.Format.Format_RGB888).copy()
+        image.setDevicePixelRatio(request.key[3])
+        rect = self.geometry_data().curve
+        p = payload.profile.data
+        px = rect.left() + (p.x+p.half_span_m)/(2*p.half_span_m)*rect.width()
+        py = rect.bottom() - p.intensity*rect.height()
+        self._polygon = QPolygonF([QPointF(float(x), float(y)) for x,y in zip(px,py)])
+        self.result, self._image = payload, image
+        self.state, self.reason = 'DISPLAY_VALID', RING_TEXT[payload.screen.visibility]
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -346,7 +359,11 @@ class AiryView(QWidget):
         painter.drawText(QRectF(g.split+12,self.height()-49,self.width()-g.split-20,42),Qt.TextFlag.TextWordWrap,
                          '蓝线：连续点光强；二维为像素面积均值\n共同视场、同一参数；不由灰度反推光强')
         painter.end()
-        if valid and self._presented_revision != self.result.request.revision:
+        if valid:
+            self._record_paint(g)
+
+    def _record_paint(self, g):
+        if self._presented_revision != self.result.request.revision:
             self._presented_revision = self.result.request.revision
             ms = (time.perf_counter_ns()-self.result.request.input_ns)/1e6
             self.paint_samples.append(dict(revision=self._presented_revision,input_to_paint_ms=ms,
