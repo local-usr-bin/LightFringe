@@ -1,59 +1,38 @@
-# LightFringe source snapshot: historical 48 paths plus reviewed explicit additions; not staging permission.
-# Root-relative exceptions use approved spelling and preserve package/fixture paths.
-# The separate SHA-bound allowlist controls file type, exact case, identity and staging.
+# LightFringe source snapshot and LF-NEXT-P2 development paths.
+# Root-relative exceptions preserve package and fixture paths.
 # Ignore rules do not untrack files and cannot prevent forced staging.
 # Lower-level ignore files, attributes and content filters require separate verification.
 #
-# Default deny applies at every depth, including unknown environment/directory names.
-# Do not replace it with broad !*.py, !lightfringe/** or !artifacts/** exceptions.
+# Default deny applies outside the file types and paths opened below.
 *
 
-# Root launch, dependency, documentation and Git controls (9 exact files).
+# Root launch, dependency and Git controls, plus maintenance Markdown.
 !/.gitattributes
 !/.gitignore
-!/CHANGELOG.md
-!/README.md
-!/THIRD-PARTY-NOTICES.md
+!/*.md
 !/requirements-a4.txt
 !/run.cmd
 !/run.ps1
 !/runtime-a4.json
 
-# All 16 accepted product modules; retain the root package topology.
+# Product and test Python sources, including nested packages.
 !/lightfringe/
-!/lightfringe/__init__.py
-!/lightfringe/__main__.py
-!/lightfringe/airy_main.py
-!/lightfringe/airy_pdf_gui.py
-!/lightfringe/airy_pdf_main.py
-!/lightfringe/annotations.py
-!/lightfringe/circular_gui.py
-!/lightfringe/circular_model.py
-!/lightfringe/circular_report.py
-!/lightfringe/circular_sampling.py
-!/lightfringe/gui.py
-!/lightfringe/model.py
-!/lightfringe/multislit.py
-!/lightfringe/rendering.py
-!/lightfringe/report.py
-!/lightfringe/sampling.py
-
-# Six original test sources; retain assertions and root-relative topology.
+!/lightfringe/**/
+!/lightfringe/**/*.py
 !/tests/
-!/tests/test_export_gui.py
-!/tests/test_gui.py
-!/tests/test_model.py
-!/tests/test_multislit.py
-!/tests/test_multislit_gui_pdf.py
-!/tests/test_report.py
+!/tests/**/
+!/tests/**/*.py
 
-# Five exact product/maintenance documents.
+# Maintenance Markdown and scientific reference data in their own trees.
 !/docs/
-!/docs/LF-P0-A2-R1.md
-!/docs/LF-P0-A3-MULTISLIT-R1.md
-!/docs/LF-P0-A4-FORMAL-IMPORT.md
-!/docs/MAINTENANCE.md
-!/docs/SCIENTIFIC_MODEL.md
+!/docs/**/
+!/docs/**/*.md
+!/references/
+!/references/**/
+!/references/**/*.md
+!/references/**/*.json
+!/references/**/*.csv
+!/references/**/*.npz
 
 # Eight active fixtures: open all ancestors, then only exact input files.
 !/artifacts/
@@ -82,22 +61,27 @@
 !/packaging/
 !/packaging/README.md
 
-# No exceptions for the 23 CONDITIONAL paths: 14 NPZ/CSV references, eight scripts,
-# and test.ps1. No exceptions for the other 331 excluded historical files.
-# Named environment guards apply at any depth; unknown names remain denied by *.
+# Local environments and task outputs stay ignored inside admitted trees.
 .venv/
 venv/
 env/
+.conda/
+conda-meta/
+site-packages/
 A4-R1/
 A4-BUILD-R1/
 _Envs/
 _Candidates/
 _Audits/
+_local-dev/
+local-build/
+next-work/
 
 # Python/tool caches and native/build products at any depth.
-# Native suffix case is explicit; all unlisted paths remain denied by *.
+# Native suffix case is explicit.
 __pycache__/
 *.py[cod]
+.cache/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -133,8 +117,22 @@ dist/
 .env.*
 *.local
 *.local.*
+*.private.*
+secrets/
+credentials/
+secrets.json
+credentials.json
+client_secret*.json
 .idea/
 .vscode/
+
+# Credentials in the scientific reference tree.
+/references/**/credentials.*
+/references/**/.credentials.*
+/references/**/secrets.*
+/references/**/.secrets.*
+/references/**/service[-_]account.json
+/references/**/service[-_]account[-_.]*.json
 
 # Accidental task/audit/control copies are never seed authority or source inputs.
 /run-output/
@@ -144,21 +142,14 @@ dist/
 /journal/
 /CURRENT.json
 /PROJECT-STATE.json
-# Do not add blanket artifacts/, *.json, *.csv or *.npz rules after the exact fixtures.
-# Future files require an explicit selection revision plus exact exceptions.
 
 # Local build configuration and generated output remain excluded.
 build-roots.local.json
 build-output/
 # Exact additions approved for LF-SOURCE-RELEASE-SNAPSHOT-R1 (spec exception follows *.spec).
-!/references/
 !/packaging/gui-r1/
 !/packaging/gui-r1/hooks/
 !/LICENSE
-!/references/README.md
-!/references/numerical-reference.json
-!/references/independent-science.json
-!/docs/SOURCE-RELEASE.md
 !/packaging/gui-r1/README.md
 !/packaging/gui-r1/LightFringe.spec
 !/packaging/gui-r1/launcher.py
