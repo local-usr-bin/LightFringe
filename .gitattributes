@@ -59,6 +59,9 @@
 /references/numerical-reference.json -text -filter -ident -working-tree-encoding -eol
 /references/independent-science.json -text -filter -ident -working-tree-encoding -eol
 /docs/SOURCE-RELEASE.md -text -filter -ident -working-tree-encoding -eol
+/docs/SCIENCE_INDEX.md -text -filter -ident -working-tree-encoding -eol
+/docs/images/classic-experiment.png -text -filter -ident -working-tree-encoding -eol
+/docs/images/multi-aperture.png -text -filter -ident -working-tree-encoding -eol
 /packaging/gui-r1/README.md -text -filter -ident -working-tree-encoding -eol
 /packaging/gui-r1/LightFringe.spec -text -filter -ident -working-tree-encoding -eol
 /packaging/gui-r1/launcher.py -text -filter -ident -working-tree-encoding -eol

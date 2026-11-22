@@ -28,6 +28,8 @@
 !/docs/
 !/docs/**/
 !/docs/**/*.md
+!/docs/images/multi-aperture.png
+!/docs/images/classic-experiment.png
 !/references/
 !/references/**/
 !/references/**/*.md

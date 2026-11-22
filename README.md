@@ -1,45 +1,69 @@
-# 光纹 LightFringe 1.0
-Windows波动光学实验程序：单缝、双缝、多缝、圆孔GUI及代表性PDF导出。
+# 光纹 LightFringe
 
-LightFringe 1.0.0 已正式公开发行。当前发行状态为 PUBLIC_RELEASE=PUBLISHED_VERIFIED。
-版权© 2026 猫太郎；公开联系233345754@qq.com。自有代码及明确列名的两份参考JSON采用[MIT](LICENSE)，第三方按[各自许可](THIRD-PARTY-NOTICES.md)。
+光纹 LightFringe 是一款用于光学教学、演示与个人探索的 **Windows 波动光学交互式模拟实验软件**。
 
-## 下载 LightFringe 1.0.0
+无需搭建真实的光学实验装置。只需在电脑上调整波长、孔径尺寸、孔间距和屏距等参数，软件便会根据理想化的物理模型，计算并展示干涉条纹、衍射图样及相对光强的变化。
 
-[正式发行页面](https://github.com/local-usr-bin/LightFringe/releases/tag/v1.0.0)
+> **2.0.0 发行文档草稿。** 2.0.0 尚未公开发行。
 
-[下载Windows x64绿色版ZIP](https://github.com/local-usr-bin/LightFringe/releases/download/v1.0.0/LightFringe-1.0-Windows-x64.zip)
+## 界面预览
 
-[SHA256校验清单](https://github.com/local-usr-bin/LightFringe/releases/download/v1.0.0/SHA256SUMS.txt)
+以下截图来自《光纹》2.0.0 开发版在 Windows 上的实际运行界面。
 
-完整解压 ZIP 后，双击 LightFringe/LightFringe.exe。请保留整个应用文件夹及 Runtime 子目录。
+![等边三圆孔实验界面，包含参数控件、二维观察屏、水平中心截面和孔径示意](docs/images/multi-aperture.png)
 
-GitHub 为官方源码和发行位置。其他平台如 GitCode 仅作为源码镜像，不保证镜像平台提供独立的二进制下载。
+*等边三圆孔在观察屏上形成沿多个方向分布的亮斑。可将二维图样与水平中心截面、孔径排列对照。*
 
-## 产品与科学范围
-A1单缝及有限缝宽双缝；A2旧模式PDF；A3多缝N=3～8；A4圆孔夫琅禾费衍射、二维艾里斑、一维相对强度与独立383×383圆孔PDF。
-采用标量、傍轴、夫琅禾费远场模型。灰度平方根映射只辅助观察，科学曲线保持线性I/I(0)。FULL/PARTIAL/OUTSIDE及PDF独立采样资格不变，超过383网格拒绝，不放宽容差。
-入口仍为lightfringe.__main__，创建AiryPdfMainWindow；16模块相对拓扑不变。[圆孔历史契约](docs/LF-P0-A4-FORMAL-IMPORT.md)和[科学模型](docs/SCIENTIFIC_MODEL.md)保留。
+![经典双缝实验界面，包含明暗条纹、相对光强曲线和单缝衍射包络](docs/images/classic-experiment.png)
+
+*经典双缝实验中，观察屏呈现竖直明暗条纹，光强沿水平方向周期变化。下方曲线与观察屏共用横坐标，虚线表示单缝衍射包络。*
+
+## 主要功能
+
+从「实验模式」选择实验。拖动滑块，或输入数值后按回车确认。每种实验提供对应的参数和观察方式。
+
+| 实验 | 可以观察什么 |
+|---|---|
+| 单缝衍射 | 调节缝宽，观察中央亮纹的宽度及两侧条纹如何变化。 |
+| 双缝干涉与衍射 | 改变缝距，对照干涉条纹、相对光强曲线与单缝衍射包络。 |
+| 多缝干涉与衍射 | 切换 3～8 条缝，比较缝数和间距对亮峰分布的影响。 |
+| 单圆孔夫琅禾费衍射 | 对照二维艾里斑与过圆心的光强截面，观察孔径变化对暗环位置的影响。 |
+| 多圆孔干涉与衍射 | 支持双圆孔、等边三圆孔、正方形四圆孔和矩形四圆孔。通过二维光强图、水平中心截面和孔径示意比较不同排列。 |
+
+## PDF 实验报告
+
+五类实验均可导出 PDF 实验报告。当参数符合对应模型与报告采样条件时，点击「导出 PDF 报告」。报告记录实验参数与科学结果，并选用合适的图样、曲线、示意图、公式与模型说明。
+
+## 下载与使用
+
+当前公开下载为 **LightFringe 1.0.0**。选择 Windows x64 绿色版，完整解压后双击 `LightFringe/LightFringe.exe`。请保留整个应用文件夹及其中的 `Runtime` 子目录。
+
+[1.0.0 正式发行页面](https://github.com/local-usr-bin/LightFringe/releases/tag/v1.0.0) · [Windows x64 绿色版 ZIP](https://github.com/local-usr-bin/LightFringe/releases/download/v1.0.0/LightFringe-1.0-Windows-x64.zip) · [SHA256 校验清单](https://github.com/local-usr-bin/LightFringe/releases/download/v1.0.0/SHA256SUMS.txt)
+
+## 科学模型与适用范围
+
+模型采用标量、傍轴和夫琅禾费远场近似，模拟相干单色、均匀平面波垂直照射理想孔径。图样和曲线来自数值模拟，光强以各配置的中心强度归一化。灰度用于辅助观察，曲线给出线性相对光强。
+
+适合教学演示和模型范围内的定性比较。真实装置的绝对照度测量、近场传播、偏振及部分相干现象需要相应的实验或模型。各实验的资料与采样条件见[科学资料索引](docs/SCIENCE_INDEX.md)。
 
 ## 从源码运行
-以下是源码运行示例。整理 1.0 源码快照时未执行这些命令。先准备并核验Windows x64、Python3.12.16、PySide6/Qt/Shiboken6.8.3、NumPy2.2.6、SciPy1.16.3、tzdata2025.2的独立环境；精确产品包锁见requirements-a4.txt。不要向冻结A4环境安装构建工具。
-在含lightfringe/的仓库根，使用已激活并核验的匹配环境：
+
+在 Windows x64 上准备独立的 Python 3.12.16 x64 环境。进入包含 `lightfringe/` 的仓库根目录，将示例解释器路径替换为自己的路径。首次安装依赖后，可直接运行最后一行。
+
 ~~~powershell
-$env:OPENBLAS_NUM_THREADS = '1'
-pythonw.exe -E -s -B -m lightfringe
-# 需要控制台时：
-python.exe -E -s -B -m lightfringe
+$python = 'C:\path\to\env\python.exe'
+& $python -m pip install -r .\requirements-a4.txt
+.\run.cmd -PythonPath $python
 ~~~
--E忽略Python环境变量，不能靠PYTHONPATH代替工作目录。需系统Microsoft YaHei UI字体及Asia/Shanghai时区数据。
-run.cmd/run.ps1原字节保留，仍绑定维护机A4-R1绝对解释器；换电脑用明确的匹配环境和模块入口，不修改执行策略或用Bypass。runtime-a4.json是原环境身份/历史字段记录，不是当前版本声明或可移植安装配置；旧venv不能复制冒充绿色包。
 
-## 目录与验证边界
-- lightfringe/：16模块；1.0 源码快照同步已批准的__init__/gui/report三份1.0标识后继，其余13模块原字节，三圆孔科学核心冻结。
-- tests/：六份旧测试原断言；67为静态方法数，不是测试执行数，也不等于完整A4覆盖。
-- artifacts/：八项活动夹具原位。23项CONDITIONAL及其它历史文件没有自动纳入。
-- [references/](references/README.md)：两份原字节、Owner授权MIT的计算/历史检查JSON，PASS/FAIL不改，不自动当新PASS或全部金标准。
-- [packaging/](packaging/README.md)：实际GUI-R1入口/spec/hook/资源及外部前置；不是无需准备即可完整构建的环境。
-- [源码与EXE对应](docs/SOURCE-RELEASE.md)、[维护](docs/MAINTENANCE.md)。
+`run.cmd` 会用指定的解释器启动 `-E -s -B -m lightfringe`，并设置 `OPENBLAS_NUM_THREADS=1`。
 
-v1.0.0 源码快照对应封存1.0程序的产品输入与构建依据；封存程序沿用历史构建，同SHA重建未验证。封存Runtime/ZIP不入库、不改动；六份第三方源码档仍随二进制ZIP提供。
-Owner已有Win11限定验收；Win10仅启动/GUI外观，功能/PDF NOT_RUN；未捕获退出码UNKNOWN。历史原生异常根因UNRESOLVED、NativeGate CLOSED、工具链FROZEN。
+[依赖锁定文件](requirements-a4.txt) · [开发维护资料](docs/MAINTENANCE.md)
+
+## 开源许可与相关文档
+
+项目自有代码及许可说明中明确列名的两份参考 JSON 采用 MIT 许可。第三方组件按各自许可分发，系统字体适用各自许可。[MIT 许可证](LICENSE) · [第三方许可说明](THIRD-PARTY-NOTICES.md)
+
+版权 © 2026 猫太郎。公开联系 [233345754@qq.com](mailto:233345754@qq.com)。
+
+[科学资料索引](docs/SCIENCE_INDEX.md) · [1.0 源码与发行件归档](docs/SOURCE-RELEASE.md)
