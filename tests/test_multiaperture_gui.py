@@ -2,18 +2,21 @@
 import threading
 import unittest
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 import numpy as np
 from PySide6.QtCore import QEventLoop, QPoint, QThread, QTimer, Qt
 from PySide6.QtGui import QFont, QImage
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QFileDialog, QLineEdit, QMessageBox
 
 from lightfringe.__main__ import AiryPdfMainWindow
 from lightfringe.multiaperture_model import Layout
 from lightfringe import multiaperture_sampling as science
+from lightfringe import multiaperture_report as report
 from lightfringe.multiaperture_view import DEFAULT_PARAMS, plot_geometry
 from lightfringe.report import ReportError
+from test_report import PDF_TEST_OUTPUT
 
 
 def wait_for(predicate, timeout_ms=8000):
@@ -187,7 +190,7 @@ class MultiApertureGuiTests(unittest.TestCase):
         self.assertIsNone(v._image)
         self.assertIsNotNone(v._polygon)
         self.assertEqual(science.assess_pdf(self.w.parameters()).status,'PDF_SAMPLE_VALID')
-        self.assertFalse(self.w.export_button.isEnabled())
+        self.assertTrue(self.w.export_button.isEnabled())
         self.w.resize(1220,820)
         self.presented()
         self.assertEqual(v.state,'DISPLAY_VALID')
@@ -199,6 +202,9 @@ class MultiApertureGuiTests(unittest.TestCase):
         spin.selectAll()
         QTest.keyClicks(spin, '560')
         self.assertEqual(v.state,'INPUT_PENDING')
+        self.assertFalse(self.w.export_button.isEnabled() or self.w._report_is_current())
+        with self.assertRaisesRegex(ReportError, '确认'):
+            self.w.report_snapshot()
         self.assertIsNone(v.result)
         self.assertIsNone(v._image)
         QTest.keyClick(spin,Qt.Key.Key_Return)
@@ -272,13 +278,17 @@ class MultiApertureGuiTests(unittest.TestCase):
             finally:
                 release.set()
 
-    def test_pdf_guard_and_return_to_each_legacy_mode(self):
+    def test_fifth_pdf_entry_and_return_to_each_legacy_mode(self):
         self.enter()
-        self.assertFalse(self.w.export_button.isEnabled() or self.w._report_is_current())
-        with self.assertRaisesRegex(ReportError,'多圆孔'):
-            self.w.report_snapshot()
-        with patch.object(self.w,'_choose_report_path') as slit, patch.object(self.w,'_choose_circular_path') as disk:
+        self.assertTrue(self.w.export_button.isEnabled() and self.w._report_is_current())
+        self.assertEqual(self.w.report_snapshot().request.params, self.w.parameters())
+        with (patch.object(self.w,'_choose_report_path') as slit,
+              patch.object(self.w,'_choose_circular_path') as disk,
+              patch.object(self.w,'_choose_array_path',return_value=None) as array,
+              patch.object(report, 'build_snapshot') as build):
             self.w.export_report()
+            array.assert_called_once()
+            build.assert_not_called()
             slit.assert_not_called()
             disk.assert_not_called()
             for index in range(4):
@@ -294,6 +304,259 @@ class MultiApertureGuiTests(unittest.TestCase):
                 self.assertTrue(target.called)
                 target.reset_mock()
                 self.assertEqual(self.w.export_button.text(),'导出 PDF 报告')
+
+    def export_path(self):
+        folder = PDF_TEST_OUTPUT / ("gui-array-" + uuid4().hex)
+        folder.mkdir(parents=True)
+        return folder / "多圆孔.pdf"
+
+    def test_export_uses_frozen_request_and_keeps_event_loop_responsive(self):
+        controls, _ = self.enter()
+        self.w.resize(980, 660)
+        controls.spacing.spin.setValue(150)
+        self.assertTrue(self.w.export_button.isEnabled())
+        original = self.w.parameters()
+        target = self.export_path()
+        started, release = threading.Event(), threading.Event()
+        seen = {}
+        build = report.build_snapshot
+
+        def choose(request):
+            seen["request"] = request
+            controls.spacing.spin.setValue(152)
+            self.w.export_report()
+            return str(target)
+
+        def held(request, control):
+            seen["build"] = request
+            seen["worker"] = QThread.currentThread() != self.w.thread()
+            started.set()
+            if not release.wait(5):
+                raise AssertionError("Worker was not released")
+            return build(request, control)
+
+        def success(*args):
+            seen["success_on_gui"] = QThread.currentThread() == self.w.thread()
+            seen["complete"] = target.read_bytes().rstrip().endswith(b"%%EOF")
+
+        with (patch.object(self.w, '_choose_array_path', side_effect=choose) as dialog,
+              patch.object(report, 'build_snapshot', side_effect=held) as compute,
+              patch.object(QMessageBox, 'information', side_effect=success) as notice,
+              patch.object(QMessageBox, 'warning') as warning):
+            try:
+                self.w.export_button.click()
+                wait_for(started.is_set)
+                self.w.export_report()
+                self.w.mode.setCurrentIndex(0)
+                self.w.export_report()
+                self.assertFalse(self.w.export_button.isEnabled())
+                self.assertFalse(target.exists())
+                pulse = threading.Event()
+                QTimer.singleShot(10, pulse.set)
+                wait_for(pulse.is_set)
+            finally:
+                release.set()
+            wait_for(lambda: self.w._array_job is None)
+            dialog.assert_called_once()
+            compute.assert_called_once()
+            notice.assert_called_once()
+            warning.assert_not_called()
+        self.assertIs(seen["request"], seen["build"])
+        self.assertEqual(seen["request"].params, original)
+        self.assertTrue(seen["worker"] and seen["success_on_gui"] and seen["complete"])
+
+    def test_native_defaults_and_cancel_before_science(self):
+        self.enter()
+        real_dialog = QFileDialog(self.w)
+        real_dialog.exec = Mock(return_value=QFileDialog.DialogCode.Rejected)
+        with (patch('lightfringe.multiaperture_gui.QFileDialog', wraps=QFileDialog, return_value=real_dialog) as cls,
+              patch.object(report, 'build_snapshot') as build):
+            cls.AcceptMode, cls.FileMode, cls.DialogCode = QFileDialog.AcceptMode, QFileDialog.FileMode, QFileDialog.DialogCode
+            self.w.export_report()
+            self.assertFalse(real_dialog.testOption(QFileDialog.Option.DontUseNativeDialog))
+            self.assertFalse(real_dialog.testOption(QFileDialog.Option.DontConfirmOverwrite))
+            self.assertEqual(real_dialog.defaultSuffix(), 'pdf')
+            self.assertEqual(real_dialog.acceptMode(), QFileDialog.AcceptMode.AcceptSave)
+            build.assert_not_called()
+        self.assertIsNone(self.w._array_job)
+
+    def test_qt_overwrite_no_then_yes_and_actual_save(self):
+        self.enter()
+        path = self.export_path()
+        path.write_bytes(b"previous report")
+        decisions = []
+        option = Qt.ApplicationAttribute.AA_DontUseNativeDialogs
+        previous = self.app.testAttribute(option)
+        self.app.setAttribute(option, True)
+        self.addCleanup(self.app.setAttribute, option, previous)
+        for overwrite in (False, True):
+            dialog = QFileDialog(self.w)
+            dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+            dialog.setDirectory(str(path.parent))
+            buttons = QMessageBox.StandardButton
+
+            def acknowledge():
+                box = QApplication.activeModalWidget()
+                if isinstance(box, QMessageBox):
+                    button = buttons.Yes if overwrite else buttons.No
+                    decisions.append(button)
+                    box.button(button).click()
+                    if not overwrite:
+                        QTimer.singleShot(0, dialog.reject)
+                else:
+                    dialog.reject()
+
+            def select():
+                dialog.findChild(QLineEdit, 'fileNameEdit').setText(path.name)
+                if dialog.selectedFiles() != [path.as_posix()]:
+                    dialog.reject()
+                    return
+                QTimer.singleShot(70, dialog, acknowledge)
+                dialog.accept()
+
+            with (patch('lightfringe.multiaperture_gui.QFileDialog', return_value=dialog) as cls,
+                  patch.object(QMessageBox, "information") as notice,
+                  patch.object(QMessageBox, "warning") as warning):
+                cls.AcceptMode, cls.FileMode, cls.DialogCode = QFileDialog.AcceptMode, QFileDialog.FileMode, QFileDialog.DialogCode
+                QTimer.singleShot(50, select)
+                self.w.export_report()
+                wait_for(lambda: self.w._array_job is None)
+                warning.assert_not_called()
+                self.assertEqual(notice.call_count, int(overwrite))
+            if overwrite:
+                self.assertTrue(path.read_bytes().rstrip().endswith(b"%%EOF"))
+            else:
+                self.assertEqual(path.read_bytes(), b"previous report")
+        self.assertEqual(decisions, [buttons.No, buttons.Yes])
+
+    def test_worker_error_feedback_and_recovery(self):
+        self.enter()
+        path = self.export_path().parent / "missing" / "bad.pdf"
+        with (patch.object(self.w, '_choose_array_path', return_value=str(path)),
+              patch.object(QMessageBox, 'information') as success, patch.object(QMessageBox, 'warning') as error):
+            self.w.export_report()
+            wait_for(lambda: self.w._array_job is None)
+            error.assert_called_once()
+            success.assert_not_called()
+        self.assertFalse(path.exists())
+        self.assertTrue(self.w.export_button.isEnabled())
+
+    def test_unconfirmed_or_invalid_input_never_opens_dialog(self):
+        controls, view = self.enter()
+        with (patch.object(self.w, "_choose_array_path") as choose,
+              patch.object(report, "build_snapshot") as build, patch.object(QMessageBox, "warning") as warn):
+            self.w._array_input_pending()
+            self.w.export_report()
+            controls.spacing.spin.setValue(40)
+            self.assertEqual(view.state, "MODEL_INVALID")
+            self.assertFalse(self.w.export_button.isEnabled())
+            self.w.export_report()
+            choose.assert_not_called()
+            build.assert_not_called()
+            self.assertEqual(warn.call_count, 2)
+
+    def test_close_during_scientific_preparation_skips_profile_and_write(self):
+        self.enter()
+        path = self.export_path()
+        started, release = threading.Event(), threading.Event()
+        prepare = report.prepare_screen
+
+        def held(*args, **kwargs):
+            started.set()
+            if not release.wait(5):
+                raise AssertionError("Screen preparation was not released")
+            return prepare(*args, **kwargs)
+
+        with (patch.object(self.w, "_choose_array_path", return_value=str(path)),
+              patch.object(report, "prepare_screen", side_effect=held),
+              patch.object(report, "prepare_profile") as profile, patch.object(report, "save_pdf_bytes") as write):
+            self.w.export_report()
+            job = self.w._array_job
+            try:
+                wait_for(started.is_set)
+                cancel = job.control.cancel
+                def cancel_then_release():
+                    cancel()
+                    release.set()
+                with patch.object(job.control, "cancel", side_effect=cancel_then_release):
+                    self.w.close()
+                self.assertFalse(job.isRunning())
+            finally:
+                release.set()
+            profile.assert_not_called()
+            write.assert_not_called()
+        self.assertFalse(path.exists())
+
+    def test_paint_error_wakes_worker_preserves_target_and_restores_entry(self):
+        self.enter()
+        path = self.export_path()
+        path.write_bytes(b"previous")
+
+        def fail(*args, **kwargs):
+            self.assertEqual(QThread.currentThread(), self.app.thread())
+            raise ReportError("模拟分页失败")
+
+        with (patch.object(self.w, "_choose_array_path", return_value=str(path)),
+              patch.object(report, "render_pdf", side_effect=fail),
+              patch.object(report, "save_pdf_bytes") as write, patch.object(QMessageBox, "information") as success,
+              patch.object(QMessageBox, "warning") as warning):
+            self.w.export_report()
+            wait_for(lambda: self.w._array_job is None)
+            write.assert_not_called()
+            success.assert_not_called()
+            self.assertIn("分页失败", warning.call_args.args[2])
+        self.assertTrue(self.w.export_button.isEnabled())
+        self.assertEqual(path.read_bytes(), b"previous")
+
+    def _close_export_at_commit(self, after_commit):
+        self.enter()
+        path = self.export_path()
+        path.write_bytes(b"prior report")
+        reached, release = threading.Event(), threading.Event()
+        commit = report.ExportControl.commit
+
+        def held(control, device):
+            if after_commit:
+                commit(control, device)
+            reached.set()
+            if not release.wait(5):
+                raise AssertionError("Commit boundary was not released")
+            if not after_commit:
+                commit(control, device)
+
+        with (patch.object(self.w, "_choose_array_path", return_value=str(path)),
+              patch.object(report.ExportControl, "commit", held),
+              patch.object(QMessageBox, "information") as success,
+              patch.object(QMessageBox, "warning") as failure):
+            self.w.export_report()
+            job = self.w._array_job
+            try:
+                wait_for(reached.is_set)
+                # Release the worker only after the close path has requested cancellation.
+                cancel = job.control.cancel
+                def cancel_then_release():
+                    cancel()
+                    release.set()
+                with patch.object(job.control, "cancel", side_effect=cancel_then_release):
+                    self.w.close()
+                self.assertFalse(job.isRunning())
+                self.assertIsNone(self.w._array_job)
+                self.assertEqual(job.control.committed, after_commit)
+            finally:
+                release.set()
+            self.app.processEvents()
+            success.assert_not_called()
+            failure.assert_not_called()
+        if after_commit:
+            self.assertTrue(path.read_bytes().rstrip().endswith(b"%%EOF"))
+        else:
+            self.assertEqual(path.read_bytes(), b"prior report")
+
+    def test_close_before_commit_preserves_file_and_joins(self):
+        self._close_export_at_commit(False)
+
+    def test_close_after_commit_preserves_completed_pdf_and_joins(self):
+        self._close_export_at_commit(True)
 
     def test_fractional_pixel_geometry_and_native_viewport_cap(self):
         for factor in (1.,1.25,1.5,2.):

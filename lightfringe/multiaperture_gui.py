@@ -1,7 +1,11 @@
 """Fifth experiment controls and routing in the existing Qt window."""
-from PySide6.QtCore import Signal, Slot
-from PySide6.QtWidgets import QApplication, QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from threading import Event
 
+from PySide6.QtCore import QThread, QTimer, Qt, Signal, Slot
+from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QHBoxLayout, QLabel,
+                               QMessageBox, QVBoxLayout, QWidget)
+
+from . import multiaperture_report as array_report
 from .circular_gui import AiryMainWindow
 from .gui import ParameterControl
 from .multiaperture_model import (DIAMETER_RANGE_M, DISTANCE_RANGE_M, WAVELENGTH_RANGE_M,
@@ -11,7 +15,45 @@ from .report import ReportError
 
 
 MODE_ID = 'multiaperture'
-PDF_NOTE = '多圆孔报告将在后续版本接入。'
+
+
+class _ArrayPdfJob(QThread):
+    """Prepare science and publish bytes. The GUI thread owns every paint device."""
+
+    prepared = Signal(object)
+
+    def __init__(self, request, path, parent):
+        super().__init__(parent)
+        self.request = request
+        self.path = path
+        self.control = array_report.ExportControl()
+        self.saved = None
+        self.error = None
+        self._rendered = Event()
+        self._document = None
+
+    def complete_render(self, document=None, error=None):
+        self._document = document
+        self.error = error
+        self._rendered.set()
+
+    def cancel(self):
+        self.control.cancel()
+        # Closing the window must also wake a worker waiting for a queued GUI paint.
+        self._rendered.set()
+
+    def run(self):
+        try:
+            snapshot = array_report.build_snapshot(self.request, self.control)
+            self.prepared.emit(snapshot)
+            self._rendered.wait()
+            self.control.checkpoint()
+            if self.error is None:
+                self.saved = array_report.save_pdf_bytes(self._document, self.path, self.control)
+        except array_report.ExportCancelled:
+            pass
+        except Exception as exc:
+            self.error = str(exc)
 
 
 class ArrayControls(QWidget):
@@ -85,6 +127,9 @@ class MultiApertureWindow(AiryMainWindow):
     def __init__(self):
         self.array_view = None
         self.array_controls = None
+        self._array_job = None
+        self._array_dialog = None
+        self._array_closing = False
         super().__init__()
         panel = ArrayControls()
         self.array_controls = panel
@@ -121,9 +166,7 @@ class MultiApertureWindow(AiryMainWindow):
             control.hide()
         self.array_controls.show()
         self.status.setFixedHeight(2*self.fontMetrics().lineSpacing()+12)
-        self.export_button.setText('导出 PDF 报告（暂未接入）')
-        self.export_button.setToolTip(PDF_NOTE)
-        self.export_button.setEnabled(False)
+        self.export_button.setText('导出 PDF 报告')
         self.view_stack.setCurrentWidget(self.array_view)
         self._changed()
         self.array_view.set_active(True)
@@ -172,20 +215,122 @@ class MultiApertureWindow(AiryMainWindow):
         color = '#28634c' if v.state == 'DISPLAY_VALID' else (
             '#526477' if v.state in ('CALCULATING','INPUT_PENDING') else '#a33020')
         self.status.setStyleSheet(f'color:{color};padding:4px;')
-        self.export_button.setEnabled(False)
+        try:
+            params = self._confirmed_array_parameters()
+            side = array_report.pdf_plan(params).selected_pdf_side
+        except ValueError as exc:
+            self.export_button.setEnabled(False)
+            self.export_button.setToolTip(str(exc))
+        else:
+            self.export_button.setEnabled(not self._exporting and not self._array_closing)
+            self.export_button.setToolTip('正在导出 PDF…' if self._exporting else
+                                         f'PDF 独立采样 {side} × {side}，水平截面 1025 点。')
+
+    def _confirmed_array_parameters(self):
+        if self.array_view.input_waiting or not self.array_controls.confirmed():
+            raise ReportError('请先确认当前多圆孔数值输入。')
+        return self.array_controls.parameters()
 
     def _report_is_current(self):
-        return False if self.is_array() else super()._report_is_current()
+        if not self.is_array():
+            return super()._report_is_current()
+        try:
+            array_report.pdf_plan(self._confirmed_array_parameters())
+        except ValueError:
+            return False
+        return True
 
     def report_snapshot(self):
         if self.is_array():
-            raise ReportError(PDF_NOTE)
+            return array_report.build_snapshot(array_report.capture_request(self._confirmed_array_parameters()))
         return super().report_snapshot()
 
+    def _choose_array_path(self, request):
+        dialog = QFileDialog(self, '导出多圆孔 PDF 报告')
+        self._array_dialog = dialog
+        try:
+            dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+            dialog.setFileMode(QFileDialog.FileMode.AnyFile)
+            dialog.setNameFilter('PDF 报告 (*.pdf)')
+            dialog.setDefaultSuffix('pdf')
+            name = PRESETS[request.params.layout]
+            dialog.selectFile(f'光纹_{name}_{request.captured_at:%Y%m%d_%H%M%S}.pdf')
+            if dialog.exec() == QFileDialog.DialogCode.Accepted:
+                paths = dialog.selectedFiles()
+                return paths[0] if paths else None
+            return None
+        finally:
+            self._array_dialog = None
+            dialog.deleteLater()
+
     def export_report(self):
-        if self.is_array():
+        if not self.is_array():
+            return super().export_report()
+        if self._exporting or self._array_closing:
             return
-        return super().export_report()
+        self._exporting = True
+        self.export_button.setEnabled(False)
+        try:
+            request = array_report.capture_request(self._confirmed_array_parameters())
+            path = self._choose_array_path(request)
+            if path and not self._array_closing:
+                job = _ArrayPdfJob(request, path, self)
+                job.prepared.connect(self._render_array_snapshot, Qt.ConnectionType.QueuedConnection)
+                job.finished.connect(self._array_export_finished, Qt.ConnectionType.QueuedConnection)
+                try:
+                    job.start()
+                except Exception:
+                    job.deleteLater()
+                    raise
+                self._array_job = job
+        except Exception as exc:
+            if not self._array_closing:
+                QMessageBox.warning(self, '无法导出多圆孔 PDF', str(exc))
+        finally:
+            if self._array_job is None:
+                self._exporting = False
+                if not self._array_closing:
+                    self._update_status()
+
+    @Slot()
+    def _array_export_finished(self):
+        if self._array_job is not None and self.sender() is self._array_job:
+            self._finish_array_job()
+
+    @Slot(object)
+    def _render_array_snapshot(self, snapshot):
+        job = self.sender()
+        if job is None or job is not self._array_job or self._array_closing:
+            return
+        try:
+            document = array_report.render_pdf(snapshot, control=job.control)
+        except Exception as exc:
+            job.complete_render(error=str(exc))
+        else:
+            # Give queued window-close events a chance before publishing the bytes.
+            QTimer.singleShot(0, self, lambda: job.complete_render(document))
+
+    def _finish_array_job(self):
+        job = self._array_job
+        job.wait()
+        self._array_job = None
+        self._exporting = False
+        job.deleteLater()
+        if self._array_closing:
+            return
+        self._update_status()
+        if job.saved is not None:
+            QMessageBox.information(self, 'PDF 报告已保存', f'保存成功：\n{job.saved}')
+        elif job.error is not None:
+            QMessageBox.warning(self, '无法导出多圆孔 PDF', f'报告未保存。\n{job.error}')
+
+    def _stop_array_export(self):
+        self._array_closing = True
+        if self._array_dialog is not None:
+            self._array_dialog.reject()
+        if self._array_job is not None:
+            self._array_job.cancel()
+            self._finish_array_job()
 
     def restore_defaults(self):
         if self.is_array():
@@ -195,11 +340,13 @@ class MultiApertureWindow(AiryMainWindow):
 
     @Slot()
     def _stop_views(self):
+        self._stop_array_export()
         if self.array_view is not None:
             self.array_view.shutdown()
         self.airy_view.shutdown()
 
     def closeEvent(self, event):
+        self._stop_array_export()
         if self.array_view is not None:
             self.array_view.shutdown()
         super().closeEvent(event)
