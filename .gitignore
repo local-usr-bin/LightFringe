@@ -159,6 +159,7 @@ build-output/
 !/packaging/gui-r1/early-origin-hook.py
 !/packaging/gui-r1/lfdiagnostics.py
 !/packaging/gui-r1/releasechecks.py
+!/packaging/gui-r1/release_contract.py
 !/packaging/gui-r1/version-resource.txt
 !/packaging/gui-r1/hooks/hook-PySide6.QtGui.py
 !/packaging/gui-r1/build-roots.example.json

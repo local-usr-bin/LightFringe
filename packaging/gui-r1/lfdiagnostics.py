@@ -1,6 +1,8 @@
 import ctypes,datetime,hashlib,json,math,os,re,struct,sys,time,traceback,winreg
 from ctypes import wintypes as W
 from pathlib import Path
+import release_contract as R
+DRAFT=None
 C=MODE=LABEL=AUDIT=RUNTIME=RESULT=None
 def digest(data):return hashlib.sha256(data).hexdigest()
 
@@ -84,7 +86,7 @@ def modules(stage,need_science=False):
             if re.match(r"^(msvcp|vcruntime|msvcr|concrt|vcomp|vcamp|vccorlib)\d.*\.dll$",name):
                 expected=next((x for x in C["system_vc"] if Path(x["Path"]).name.lower()==name),None)
                 row["category"]="REQUIRED_CENTRAL_VC"
-                if expected is None or canon(path)!=canon(expected["Path"]) or row["sha256"]!=expected["SHA256"]:
+                if expected is None or canon(path)!=canon(expected["Path"]) or row["sha256"]!=expected["SHA256"] or row["version"]!=expected["Version"]:
                     issues.append({"kind":"VC_ORIGIN_OR_IDENTITY_VIOLATION","path":str(path)})
                 vc.append(row)
             elif name in approved_by_name:
@@ -279,48 +281,170 @@ def _init_api():
     HANDLE=K.GetCurrentProcess()
 
 
-def _initialize():
-    global C,MODE,LABEL,AUDIT,RUNTIME,RESULT,SYSTEM,K,P,V,HANDLE
+def _initialize(variant="control"):
+    global C,MODE,LABEL,AUDIT,RUNTIME,RESULT,SYSTEM,K,P,V,HANDLE,DRAFT
     if C is not None:return
-    require(len(sys.argv)>=4 and sys.argv[1]=="--lf-diagnostic","invalid diagnostic invocation")
-    MODE=sys.argv[2];require(MODE in ("science","gui-pdf"),"unapproved diagnostic mode")
-    C=json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
-    RUNTIME=Path(sys.executable).resolve().parent;AUDIT=Path(C["audit"]);LABEL="frozen-"+MODE
-    C["runtime"]=str(RUNTIME);C["source"]=str(RUNTIME);C["science_source"]=str(RUNTIME/"Runtime"/"science-source")
-    C["references"]=[{"Path":str(RUNTIME/"Runtime"/"science-data"/r["name"]),"SHA256":r["sha256"]} for r in C["reference_inputs"]]
-    RESULT={"mode":MODE,"label":LABEL,"pid":os.getpid(),"ppid":os.getppid(),"status":"STARTED","events":[],"module_snapshots":[]}
-    require(getattr(sys,"frozen",False) and canon(sys._MEIPASS)==canon(RUNTIME/"Runtime"),"not expected Runtime-subdirectory onedir frozen layout")
+    require(len(sys.argv)==7 and sys.argv[1]=="--lf-diagnostic","invalid v2 diagnostic invocation")
+    mode=sys.argv[2]
+    require(mode in ("science","gui-pdf"),"unapproved diagnostic mode")
+    draft=R.read_draft(sys.argv[5],sys.argv[6])
+    closed=R.read_pinned_json(sys.argv[3],sys.argv[4])
+    bundle=Path(sys.executable).resolve().parent
+    require(getattr(sys,"frozen",False) and canon(sys._MEIPASS)==canon(bundle/"Runtime"),
+            "not expected Runtime-subdirectory onedir frozen layout")
     require(sys.version_info[:3]==(3,12,16) and struct.calcsize("P")==8,"frozen interpreter mismatch")
-    require(sha(sys.executable)==C["exe_sha256"],"frozen executable changed")
+    R.require_closed(draft,closed,sys.argv[6],bundle,variant)
+    require(sha(sys.executable)==closed["exe_sha256"],"frozen executable changed")
+    audit=Path(closed["audit"]).resolve()
+    require(audit.is_dir() and not audit.is_relative_to(bundle),"audit directory missing or in payload")
+    windows=Path(os.environ["SystemRoot"]).resolve()
+    require(Path(closed["windows_directory"]).resolve()==windows and
+            Path(closed["system_directory"]).resolve()==windows/"System32", "unapproved Windows system roots")
+    require({entry["Scope"] for entry in closed["persistent_paths"]}=={"User","Machine"},
+            "missing target persistent PATH baseline")
+    C,DRAFT,RUNTIME,MODE,AUDIT=closed,draft,bundle,mode,audit
+    LABEL="frozen-"+MODE
+    C["runtime"]=str(RUNTIME);C["source"]=str(RUNTIME);C["science_source"]=str(RUNTIME/"Runtime"/"science-source")
+    reference_pins={r["name"]:r["sha256"] for r in DRAFT["reference_inputs"]}
+    C["references"]=[{"Path":str(RUNTIME/"Runtime"/"science-data"/name),"SHA256":reference_pins[name]}
+                     for name in ("numerical-reference.json","independent-science.json")]
+    C["source_hashes"]={"lightfringe/"+name:row["sha256"] for name,row in DRAFT["science_sources"].items()}
+    C["bundle_native"]=[{"relative":name,"sha256":value} for name,value in closed["native_sha256"].items()]
+    C["system_vc"]=[{"Path":str(RUNTIME/"Runtime"/name),"SHA256":value["sha256"],
+                     "Version":value["file_version"]} for name,value in DRAFT["layout"]["vc_dlls"].items()]
+    C["openblas"]=[{"path":str(RUNTIME/"Runtime"/name),"sha256":digest}
+                   for name,digest in DRAFT["pe_derivation"]["openblas"].items()]
+    C["old_import"]=DRAFT["pe_derivation"]["old_import"]
+    sys.dont_write_bytecode=True
+    RESULT={"mode":MODE,"label":LABEL,"pid":os.getpid(),"ppid":os.getppid(),"status":"STARTED",
+            "source_head":DRAFT["source_head"],"source_anchor_sha256":sys.argv[6],
+            "closure_sha256":sys.argv[4],"events":[],"module_snapshots":[]}
     _init_api()
     K.GetConsoleWindow.argtypes=[]
     K.GetConsoleWindow.restype=W.HWND
     console_hwnd=K.GetConsoleWindow()
     RESULT["console_observation"]={"api":"GetConsoleWindow","hwnd":int(console_hwnd) if console_hwnd else 0,"attached":bool(console_hwnd),"utc":datetime.datetime.now(datetime.timezone.utc).isoformat(),"monotonic_ns":time.perf_counter_ns(),"scope":"Current-process console association; not a visual screenshot","last_error":"NOT_APPLICABLE_ZERO_MEANS_NO_ASSOCIATED_CONSOLE"}
     require(not console_hwnd,"windowed executable unexpectedly has an associated console")
+
 def early_probe():
     _initialize()
     RESULT["identity"]={"executable":sys.executable,"sha256":sha(sys.executable),"prefix":sys.prefix,"base_prefix":sys.base_prefix,"MEIPASS":sys._MEIPASS,"version":sys.version,"architecture_bits":64}
     RESULT["environment_begin"]=environment()
     modules("earliest-python-custom-runtimehook")
+def verify_product_modules():
+    import importlib
+    import lightfringe
+    R.require_product(DRAFT,lightfringe.__version__,lightfringe.__build__,lightfringe.__baseline__)
+    names={"lightfringe","lightfringe.__main__","lightfringe.gui","lightfringe.airy_pdf_gui",
+           "lightfringe.multiaperture_gui","lightfringe.multiaperture_view","lightfringe.report_layout"}
+    names.update(row["writer"] for row in DRAFT["modes"])
+    names.update("lightfringe."+Path(name).stem for name in DRAFT["science_sources"])
+    RESULT["product_module_identity"]=[
+        R.require_frozen_module(DRAFT,C,name,importlib.import_module(name),RUNTIME/"Runtime")
+        for name in sorted(names)]
+
+
+def multiaperture_checks():
+    """Bounded release cases taken from the approved C1 sampling tests."""
+    from dataclasses import replace
+    from lightfringe.multiaperture_model import Field,Layout,MultiApertureParameters
+    from lightfringe import multiaperture_sampling as s
+
+    pair=MultiApertureParameters()
+    dense=replace(pair,layout=Layout.RECTANGLE,wavelength_m=405e-9,diameter_m=65e-6,
+                  spacing_m=170e-6,spacing_y_m=125e-6,angle_deg=35.)
+    require(tuple(DRAFT["array_sampling"]["pdf_grid_sides"]) == s.PDF_GRID_SIDES == (383,511,767)
+            and DRAFT["array_sampling"]["profile_points"] == s.PDF_PROFILE_POINTS == 1025,
+            "C1 sampling constants differ")
+    below=s.assess_gui(pair,300,300,401)
+    require(below.model.status=="MODEL_VALID" and below.status=="GUI_SAMPLE_INVALID"
+            and not below.grid.valid and s.assess_pdf(pair).status=="PDF_SAMPLE_VALID",
+            "C1 GUI/PDF independent admission failed")
+    tiers=[]
+    for p,field,side,required in ((pair,None,383,(355,124)),
+                                (dense,Field(.03,.03),511,(491,471)),(dense,None,767,(579,556))):
+        plan=s.assess_pdf(p,field=field,profile_angle_deg=45)
+        require(plan.status=="PDF_SAMPLE_VALID" and plan.selected_pdf_side==side
+                and plan.grid.required_xy==required and plan.profile.points==1025,
+                "C1 minimum eligible PDF tier differs")
+        tiers.append({"selected":side,"required_xy":required,"profile_points":plan.profile.points})
+
+    p=replace(pair,wavelength_m=380e-9,distance_m=3.,diameter_m=100e-6,spacing_m=370e-6,angle_deg=45.)
+    field=Field(.09,.09)
+    short=s.assess_pdf(p,field=field,profile_angle_deg=45)
+    require(short.grid.valid and short.selected_pdf_side==767 and short.profile.required_points==1261
+            and short.status=="PDF_SAMPLE_INVALID","C1 insufficient profile was accepted")
+    try:
+        s.prepare_profile(p,1025,field=field,profile_angle_deg=45)
+    except s.SamplingError:
+        pass
+    else:
+        raise RuntimeError("C1 insufficient profile produced scientific data")
+
+    p=replace(pair,wavelength_m=380e-9,spacing_m=166e-6,distance_m=.8)
+    field=Field(.0399,.001)
+    excess=s.assess_pdf(p,field=field,profile_angle_deg=90)
+    require(excess.model.status=="MODEL_VALID" and excess.grid.required_xy==(775,7)
+            and excess.selected_pdf_side is None and excess.status=="PDF_SAMPLE_INVALID",
+            "C1 over-limit grid was accepted")
+    try:
+        s.prepare_screen(p,767,767,field=field)
+    except s.SamplingError:
+        pass
+    else:
+        raise RuntimeError("C1 insufficient grid produced scientific data")
+    invalid=s.assess_pdf(replace(pair,spacing_m=0.))
+    require(invalid.model.status=="MODEL_INVALID" and invalid.status=="NOT_EVALUATED",
+            "C1 invalid model entered sampling")
+    return {"status":"PASS","tiers":tiers,"gui_pdf_independent":True,
+            "profile_1261_with_1025_rejected":True,"grid_775_rejected":True,"invalid_model_rejected":True}
+
+
+def closed_workers(window):
+    array_view=window.array_view
+    row={"closed":bool(window.airy_view.closed),"worker_running":bool(window.airy_view._thread.isRunning()),
+         "array_closed":array_view is None or bool(array_view.closed),
+         "array_worker_running":array_view is not None and bool(array_view._thread.isRunning()),
+         "array_export_active":window._array_job is not None or window._array_dialog is not None}
+    require(row["closed"] and row["array_closed"] and
+            not (row["worker_running"] or row["array_worker_running"] or row["array_export_active"]),
+            "GUI shutdown did not recover all display and PDF workers")
+    return row
+
+
 def gui_pdf():
-    from PySide6.QtCore import QCoreApplication,qVersion
-    from PySide6.QtGui import QFont,QFontInfo,QGuiApplication
+    from PySide6.QtCore import qVersion
+    from PySide6.QtGui import QFont,QFontInfo,QGuiApplication,QIcon
     from PySide6.QtWidgets import QApplication
     from lightfringe.airy_pdf_gui import AiryPdfMainWindow
-    from lightfringe import report,circular_report
+    from lightfringe import report,circular_report,multiaperture_report
     from zoneinfo import ZoneInfo
     require(QApplication.instance() is None,"unexpected existing QApplication")
     app=QApplication(sys.argv[:1]);app.setApplicationName("光纹 LightFringe");app.setFont(QFont("Microsoft YaHei UI",10));app.setStyle("Fusion")
     require(QGuiApplication.platformName()=="windows","GUI did not load native Windows platform")
+    require(qVersion()==DRAFT["build_pins"]["qt"],"actual Qt runtime version differs")
     font=QFontInfo(app.font()).family()
     require(font=="Microsoft YaHei UI","requested font substituted: "+font)
     require(datetime.datetime(2026,1,1,tzinfo=ZoneInfo("Asia/Shanghai")).utcoffset()==datetime.timedelta(hours=8),"timezone data missing")
     window=None;rows=[]
+    writers={"lightfringe.report":report,"lightfringe.circular_report":circular_report,
+             "lightfringe.multiaperture_report":multiaperture_report}
     try:
-        window=AiryPdfMainWindow();window.show();app.processEvents()
+        icon=QIcon(str(RUNTIME/"Runtime"/DRAFT["icon"]["path"]))
+        app.setWindowIcon(icon)
+        window=AiryPdfMainWindow()
+        window.setWindowIcon(icon)
+        window.show()
+        app.processEvents()
+        preset=window.array_controls.preset
+        R.require_modes(DRAFT,[window.mode.itemText(i) for i in range(window.mode.count())],
+                        [(str(getattr(preset.itemData(i),"value",preset.itemData(i))),preset.itemText(i)) for i in range(preset.count())])
+        R.require_window(DRAFT,app.applicationVersion(),window.windowTitle())
+        require(window.mode.currentIndex()==0,"default experiment is not single-slit")
+        require(not window.windowIcon().isNull() and not app.windowIcon().isNull(),"missing app/window icon")
         modules("native-main-window")
-        for index,name in enumerate(["single-slit","double-slit","multi-slit","circular"]):
+        for index,mode in enumerate(DRAFT["modes"]):
+            name=mode["id"]
             window.mode.setCurrentIndex(index)
             if index in (0,1):window._load_values((550,30,150,1.));window._changed()
             else:window.restore_defaults()
@@ -330,37 +454,43 @@ def gui_pdf():
                 if index<3:
                     ready=window._report_is_current() and window.view.data is not None and not window.view.error and bool(window.view.paint_times_ms)
                 else:
-                    view=window.airy_view
+                    view=window.airy_view if name=="circular" else window.array_view
                     ready=view.state=="DISPLAY_VALID" and view.result is not None and view._presented_revision==view.result.request.revision
                 if ready:break
                 require(time.monotonic()<deadline,"GUI readiness deadline: "+name)
                 time.sleep(.01)
+            require(window.export_button.isEnabled(),"PDF entry disabled for representative "+name)
             snapshot=window.report_snapshot()
             pdf=AUDIT/(name+".pdf");require(not pdf.exists(),"PDF output already exists")
             ledger={}
-            if index==3:circular_report.write_pdf(snapshot,pdf,layout_audit=ledger)
-            else:report.write_pdf(snapshot,pdf)
+            writer=writers[mode["writer"]]
+            if writer is report:writer.write_pdf(snapshot,pdf)
+            else:writer.write_pdf(snapshot,pdf,layout_audit=ledger)
             data=pdf.read_bytes()
-            require(len(data)>1000 and data.startswith(b"%PDF-") and data.rstrip().endswith(b"%%EOF"),"invalid PDF envelope")
-            pages=len(re.findall(rb"/Type\s*/Page(?:\s|/|>)",data))
-            require(pages==(1 if index<3 else 2) or (index==3 and pages==3),"unexpected PDF page count")
+            pages,creator=R.inspect_qt_pdf(DRAFT,name,data,None if writer is report else ledger)
             image=AUDIT/(name+".png");require(not image.exists(),"image output exists")
             require(window.grab().save(str(image),"PNG"),"GUI capture failed")
-            rows.append({"mode":name,"index":index,"gui_ready":True,"pdf":str(pdf),"pdf_sha256":sha(pdf),"pdf_bytes":len(data),"pdf_pages":pages,"layout_ledger":ledger,"screenshot":str(image),"screenshot_sha256":sha(image)})
-            emit("GUI_PDF_MODE_PASS",mode=name,pdf_pages=pages)
-        RESULT["gui_pdf"]={"status":"PASS","platform":QGuiApplication.platformName(),"qt_version":qVersion(),"font":font,"timezone":"Asia/Shanghai","modes":rows,"owner_visual_acceptance":"NOT_RUN"}
-        modules("after-gui-and-four-pdf",True)
+            rows.append({"mode":name,"index":index,"gui_ready":True,"pdf":str(pdf),"pdf_sha256":sha(pdf),
+                         "pdf_bytes":len(data),"pdf_pages":pages,"creator":creator,"layout_ledger":ledger,
+                         "screenshot":str(image),"screenshot_sha256":sha(image)})
+            emit("GUI_PDF_WRITE_PASS",mode=name,pdf_pages=pages)
+        RESULT["gui_pdf"]={"status":"PASS","scope":"GUI readiness and product snapshot/writer",
+                           "page_text_readback":"NOT_RUN_EXTERNAL_REQUIRED","native_save_dialog":"NOT_RUN",
+                           "platform":QGuiApplication.platformName(),"qt_version":qVersion(),
+                           "application_version":app.applicationVersion(),"font":font,
+                           "timezone":"Asia/Shanghai","modes":rows,"owner_visual_acceptance":"NOT_RUN"}
+        modules("after-gui-and-five-pdf",True)
     finally:
         if window is not None:
             window.close();app.processEvents()
-            closed=window.airy_view.closed
-            running=window.airy_view._thread.isRunning()
-            RESULT["gui_close"]={"closed":closed,"worker_running":running}
-            require(closed and not running,"original GUI shutdown not complete")
+            RESULT["gui_close"]=closed_workers(window)
         app.quit()
+
 def main():
     try:
         _initialize();emit("BEGIN_FROZEN",mode=MODE)
+        verify_product_modules()
+        RESULT["multiaperture_science"]=multiaperture_checks()
         if MODE=="science":
             import numpy as np
             import scipy
@@ -371,6 +501,9 @@ def main():
             compatibility(np,scipy);gui_pdf()
         RESULT["environment_end"]=environment();RESULT["status"]="PASS_WITH_ENVIRONMENT_CAVEAT" if RESULT.get("external_environment_assessment",{}).get("observed") else "PASS";emit("COMPLETE_FROZEN",status=RESULT["status"])
     except BaseException as exc:
+        if RESULT is None:
+            traceback.print_exc()
+            return 1
         RESULT["status"]="FAIL";RESULT["error"]={"type":type(exc).__name__,"message":str(exc),"traceback":traceback.format_exc()}
         traceback.print_exc();emit("STOP_FROZEN",error=str(exc))
     save_new(LABEL+"-result.json",RESULT)

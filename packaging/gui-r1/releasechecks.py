@@ -14,6 +14,7 @@ import traceback
 from pathlib import Path
 
 import lfdiagnostics as D
+import release_contract as R
 
 
 def _failure(exc):
@@ -46,8 +47,7 @@ def _dispose_application(stage):
     for window in windows:
         if hasattr(window, "airy_view"):
             window.close()
-            D.require(window.airy_view.closed and not window.airy_view._thread.isRunning(),
-                      "application cleanup found an unclosed circular worker")
+            D.closed_workers(window)
     D.require(not any(w.isVisible() for w in app.topLevelWidgets()),
               "application cleanup found a remaining visible window")
     app.quit()
@@ -111,14 +111,12 @@ def _external_python_identity(mode):
     build = lightfringe.__build__
     D.RESULT["release_metadata"] = {"version": version, "build": build,
                                     "baseline": lightfringe.__baseline__}
-    D.require(D.C["release_version"] == "1.0.0" and version == D.C["release_version"],
-              "release source version is not the bound 1.0.0")
-    D.require(build == D.C["release_build"] and "B0" in build,
-              "release source build is not the exact bound B0 build")
+    R.require_product(D.DRAFT, version, build, lightfringe.__baseline__)
+    D.verify_product_modules()
 
 
 def _control_gui_pdf():
-    """Observe the real window returned to the unchanged four-mode helper."""
+    """Observe the actual window used by the five-mode diagnostic writer."""
     from lightfringe import airy_pdf_gui
     original = airy_pdf_gui.AiryPdfMainWindow
     observations = []
@@ -131,7 +129,10 @@ def _control_gui_pdf():
                "observation_wiring": "test-only constructor factory returns the original actual window class"}
         observations.append(row)
         try:
-            D.require("1.0.0" in row["title"], "real GUI window title lacks version 1.0.0")
+            from PySide6.QtWidgets import QApplication
+            app_version = QApplication.instance().applicationVersion()
+            R.require_window(D.DRAFT, app_version, row["title"])
+            row["application_version"] = app_version
         except BaseException:
             _record_cleanup("control window after metadata failure", window.close)
             raise
@@ -142,11 +143,12 @@ def _control_gui_pdf():
         D.gui_pdf()
     finally:
         airy_pdf_gui.AiryPdfMainWindow = original
-    D.require(len(observations) == 1, "four-mode helper did not create exactly one actual window")
-    D.require(D.RESULT["gui_pdf"]["status"] == "PASS" and len(D.RESULT["gui_pdf"]["modes"]) == 4,
-              "four-mode/PDF helper did not complete all modes")
+    D.require(len(observations) == 1, "GUI helper did not create exactly one actual window")
+    D.require(D.RESULT["gui_pdf"]["status"] == "PASS" and
+              [row["mode"] for row in D.RESULT["gui_pdf"]["modes"]] == [row["id"] for row in D.DRAFT["modes"]],
+              "five-mode PDF writer did not complete all modes")
     D.require(D.RESULT["gui_close"]["closed"] and not D.RESULT["gui_close"]["worker_running"],
-              "four-mode/PDF helper did not close naturally")
+              "five-mode PDF writer did not close naturally")
 
 
 def _replacement_native_witness():
@@ -218,8 +220,10 @@ def _actual_main_probe():
             if window is not None:
                 row["close_requested"] = True
                 row["close_return"] = bool(window.close())
-                row["circular_closed"] = bool(window.airy_view.closed)
-                row["circular_worker_running"] = bool(window.airy_view._thread.isRunning())
+                workers = D.closed_workers(window)
+                row["circular_closed"] = workers["closed"]
+                row["circular_worker_running"] = workers["worker_running"]
+                row["closed_workers"] = workers
         except BaseException as exc:
             if holder["callback_error"] is None:
                 holder["callback_error"] = _failure(exc)
@@ -246,7 +250,11 @@ def _actual_main_probe():
                             "window_class": type(window).__module__ + "." + type(window).__qualname__,
                             "mode_index": window.mode.currentIndex(),
                             "application_name": app.applicationName()})
-                D.require("1.0.0" in row["title"], "actual product main title lacks version 1.0.0")
+                R.require_window(D.DRAFT, app.applicationVersion(), row["title"])
+                row["application_version"] = app.applicationVersion()
+                row["icon_present"] = not app.windowIcon().isNull() and not window.windowIcon().isNull()
+                D.require(row["icon_present"], "actual main did not install the packaged application icon")
+                D.require(row["mode_index"] == 0, "actual main did not select single slit")
                 D.modules("actual-main-visible", True)
                 finish()
             elif elapsed >= 5.0 or len(row["ticks"]) >= 120:
@@ -294,17 +302,14 @@ def main():
     fallback = {"status": "FAIL", "events": [], "module_snapshots": [],
                 "full_science35": "NOT_RUN", "historical_native_gate": "CLOSED"}
     try:
-        D.require(len(original_argv) == 4 and original_argv[1] == "--lf-release-check",
+        D.require(len(original_argv) == 7 and original_argv[1] == "--lf-release-check",
                   "invalid explicit release-check invocation")
         mode = original_argv[2]
         D.require(mode in ("control", "replacement"), "unsupported release-check mode")
         label = "release-" + mode
-        contract = Path(original_argv[3]).resolve()
-        config = json.loads(contract.read_text(encoding="utf-8"))
-        audit = Path(config["audit"]).resolve()
-        D.require(audit.is_dir(), "release-check audit directory does not exist")
-        sys.argv = [original_argv[0], "--lf-diagnostic", "gui-pdf", str(contract)]
-        D._initialize()
+        sys.argv = [original_argv[0], "--lf-diagnostic", "gui-pdf", *original_argv[3:]]
+        D._initialize(variant=mode)
+        audit = D.AUDIT
         D.LABEL = label
         D.RESULT.update({"label": label, "release_check": mode, "full_science35": "NOT_RUN",
                          "historical_native_gate": "CLOSED", "cleanup_failures": []})
@@ -318,6 +323,7 @@ def main():
                   all(r["status"] == "PASS" for r in D.RESULT["compatibility"]),
                   "original nine bounded compatibility checks did not all complete")
         if mode == "control":
+            D.RESULT["multiaperture_science"] = D.multiaperture_checks()
             D.require(D.C["replacement_native"] == [], "control cannot authorize modified native files")
             _control_gui_pdf()
         else:

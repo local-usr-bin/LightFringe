@@ -30,13 +30,16 @@ ICON=SRC/"lightfringe"/"assets"/"LightFringe.ico"
 datas=collect_data_files("tzdata")
 datas += [(str(ICON),"lightfringe/assets")]
 datas += [(str(SRC/"references"/name),"science-data") for name in ("numerical-reference.json","independent-science.json")]
-datas += [(str(SRC/"lightfringe"/name),"science-source") for name in ("circular_model.py","circular_sampling.py","circular_report.py")]
+datas += [(str(SRC/"lightfringe"/name),"science-source") for name in ("circular_model.py","circular_sampling.py","circular_report.py","multiaperture_model.py","multiaperture_sampling.py")]
 a=Analysis([str(SCRIPTS/"launcher.py")],pathex=[str(SRC),str(SCRIPTS)],binaries=[(str(BUILD_ENV/name),".") for name in ("libssl-3-x64.dll","libcrypto-3-x64.dll")],datas=datas,
     hiddenimports=["releasechecks","lfdiagnostics","lightfringe.__main__","scipy.linalg","scipy.special","numpy.fft._pocketfft_umath","numpy._core._multiarray_umath"],
     hookspath=[R["hooks"]],runtime_hooks=[str(SCRIPTS/"early-origin-hook.py")],
     excludes=["PyQt5","PyQt6","PySide2","matplotlib","IPython","pytest","tkinter"]+qt_excludes,noarchive=False,module_collection_mode={"PySide6":"py","shiboken6":"py"})
-diag_sources=[x[1] for x in a.pure if x[0]=="lfdiagnostics"]
-assert len(diag_sources)==1 and Path(diag_sources[0]).resolve()==(SCRIPTS/"lfdiagnostics.py").resolve(),diag_sources
+diag_names={"lfdiagnostics","releasechecks","release_contract"}
+diag_toc=[x for x in a.pure if x[0] in diag_names]
+assert len(diag_toc)==len(diag_names) and {x[0] for x in diag_toc}==diag_names,diag_toc
+for name,source,_ in diag_toc:
+    assert Path(source).resolve()==(SCRIPTS/(name+".py")).resolve(),(name,source)
 mesa_entries=[e for e in a.binaries if str(e[0]).replace("\\","/").casefold()=="pyside6/opengl32sw.dll"]
 assert len(mesa_entries)==1,mesa_entries
 assert Path(mesa_entries[0][1]).resolve().is_relative_to(BUILD_ENV.resolve())
@@ -64,4 +67,4 @@ exe.dependencies=clean(exe.dependencies,"EXE.dependencies")
 assert not any(excluded(x) for x in [*a.binaries,*a.datas,*exe.dependencies])
 coll=COLLECT(exe,a.binaries,a.datas,strip=False,upx=False,name="LightFringe")
 with (AUDIT/"RELEASE-VC-TOC-EXCLUSIONS.json").open("x",encoding="utf-8") as f:json.dump({"policy":"Exclude uncontrolled build-environment VC at all TOC boundaries; attach five sealed official 14.52 files to Runtime afterwards","entries":removed,"count":len(removed)},f,indent=2)
-with (AUDIT/"RELEASE-COLLECTED-TOC.json").open("x",encoding="utf-8") as f:json.dump({"binaries":[list(x) for x in a.binaries],"datas":[list(x) for x in a.datas],"exe_dependencies":[list(x) for x in exe.dependencies]},f,indent=2)
+with (AUDIT/"RELEASE-COLLECTED-TOC.json").open("x",encoding="utf-8") as f:json.dump({"binaries":[list(x) for x in a.binaries],"datas":[list(x) for x in a.datas],"exe_dependencies":[list(x) for x in exe.dependencies],"product_pure":[list(x) for x in a.pure if x[0]=="lightfringe" or x[0].startswith("lightfringe.")],"diagnostic_pure":[list(x) for x in diag_toc]},f,indent=2)
