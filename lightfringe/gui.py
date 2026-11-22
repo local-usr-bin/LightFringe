@@ -2,7 +2,7 @@
 import time
 from dataclasses import dataclass
 import numpy as np
-from PySide6.QtCore import Qt, QRectF, QPointF, Signal
+from PySide6.QtCore import QCoreApplication, Qt, QRectF, QPointF, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFrame,
@@ -348,6 +348,7 @@ class Apparatus(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        QCoreApplication.setApplicationVersion(__version__)
         self.setWindowTitle(f"光纹 LightFringe {__version__} · {__build__}")
         self.resize(1220, 820)
         self.setMinimumSize(980, 660)
