@@ -26,7 +26,9 @@ def clean(toc,stage):
 BUILD_ENV=Path(R["build_env"])
 qt_keep={"QtCore","QtGui","QtWidgets"}
 qt_excludes=["PySide6."+p.stem for p in (BUILD_ENV/"Lib"/"site-packages"/"PySide6").glob("Qt*.pyd") if p.stem not in qt_keep]
+ICON=SRC/"lightfringe"/"assets"/"LightFringe.ico"
 datas=collect_data_files("tzdata")
+datas += [(str(ICON),"lightfringe/assets")]
 datas += [(str(SRC/"references"/name),"science-data") for name in ("numerical-reference.json","independent-science.json")]
 datas += [(str(SRC/"lightfringe"/name),"science-source") for name in ("circular_model.py","circular_sampling.py","circular_report.py")]
 a=Analysis([str(SCRIPTS/"launcher.py")],pathex=[str(SRC),str(SCRIPTS)],binaries=[(str(BUILD_ENV/name),".") for name in ("libssl-3-x64.dll","libcrypto-3-x64.dll")],datas=datas,
@@ -57,7 +59,7 @@ for e in a.binaries:
         assert (parts[-2].lower(),parts[-1].lower()) in allowed_plugins,e
 a.datas=clean(a.datas,"Analysis.datas")
 pyz=PYZ(a.pure)
-exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name="LightFringe",debug=False,bootloader_ignore_signals=False,strip=False,upx=False,console=False,contents_directory="Runtime",disable_windowed_traceback=False,version=str(SCRIPTS/"version-resource.txt"))
+exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name="LightFringe",debug=False,bootloader_ignore_signals=False,strip=False,upx=False,console=False,contents_directory="Runtime",disable_windowed_traceback=False,version=str(SCRIPTS/"version-resource.txt"),icon=str(ICON))
 exe.dependencies=clean(exe.dependencies,"EXE.dependencies")
 assert not any(excluded(x) for x in [*a.binaries,*a.datas,*exe.dependencies])
 coll=COLLECT(exe,a.binaries,a.datas,strip=False,upx=False,name="LightFringe")

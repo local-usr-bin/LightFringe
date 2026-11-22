@@ -19,6 +19,7 @@
 !/lightfringe/
 !/lightfringe/**/
 !/lightfringe/**/*.py
+!/lightfringe/assets/LightFringe.ico
 !/tests/
 !/tests/**/
 !/tests/**/*.py
