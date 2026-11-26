@@ -4,7 +4,7 @@
 
 无需搭建真实的光学实验装置。只需在电脑上调整波长、孔径尺寸、孔间距和屏距等参数，软件便会根据理想化的物理模型，计算并展示干涉条纹、衍射图样及相对光强的变化。
 
-> **2.0.0 发行文档草稿。** 2.0.0 尚未公开发行。
+> **2.0.0 正式发行。** [查看发行说明](https://github.com/local-usr-bin/LightFringe/releases/tag/v2.0.0)
 
 ## 界面预览
 
@@ -36,9 +36,9 @@
 
 ## 下载与使用
 
-当前公开下载为 **LightFringe 1.0.0**。选择 Windows x64 绿色版，完整解压后双击 `LightFringe/LightFringe.exe`。请保留整个应用文件夹及其中的 `Runtime` 子目录。
+当前公开下载为 **LightFringe 2.0.0**。选择 Windows x64 绿色版，完整解压后双击 `LightFringe/LightFringe.exe`。请保留整个应用文件夹及其中的 `Runtime` 子目录。
 
-[1.0.0 正式发行页面](https://github.com/local-usr-bin/LightFringe/releases/tag/v1.0.0) · [Windows x64 绿色版 ZIP](https://github.com/local-usr-bin/LightFringe/releases/download/v1.0.0/LightFringe-1.0-Windows-x64.zip) · [SHA256 校验清单](https://github.com/local-usr-bin/LightFringe/releases/download/v1.0.0/SHA256SUMS.txt)
+[Windows x64 绿色版 ZIP](https://github.com/local-usr-bin/LightFringe/releases/download/v2.0.0/LightFringe-2.0.0-Windows-x64.zip) · [独立源码 ZIP](https://github.com/local-usr-bin/LightFringe/releases/download/v2.0.0/LightFringe-2.0.0-source.zip) · [SHA256 校验清单](https://github.com/local-usr-bin/LightFringe/releases/download/v2.0.0/SHA256SUMS.txt)
 
 ## 科学模型与适用范围
 
